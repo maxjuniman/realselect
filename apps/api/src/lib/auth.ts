@@ -7,18 +7,13 @@ function secret() {
   return process.env.JWT_SECRET || "realselect-dev-secret";
 }
 
-export async function ensureAdmin() {
-  const email = (process.env.ADMIN_EMAIL || "admin@realselect.fc").toLowerCase();
-  const password = process.env.ADMIN_PASSWORD || "realselect2026";
-  const name = process.env.ADMIN_NAME || "Administrador";
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) return existing;
-  return prisma.user.create({
-    data: {
-      name,
-      email,
-      passwordHash: bcrypt.hashSync(password, 10),
-    },
+export async function createUser(name: string, email: string, password: string) {
+  const normalized = email.toLowerCase().trim();
+  const passwordHash = bcrypt.hashSync(password, 10);
+  return prisma.user.upsert({
+    where: { email: normalized },
+    update: { name, passwordHash },
+    create: { name, email: normalized, passwordHash },
   });
 }
 

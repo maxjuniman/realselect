@@ -1,33 +1,38 @@
+name: realselect
+
 services:
   api:
+    container_name: realselect-api
     build:
       context: .
       dockerfile: apps/api/Dockerfile
     environment:
-      DATABASE_URL: file:/data/realselect.db
+      DATABASE_URL: ${DATABASE_URL:?Defina DATABASE_URL no .env}
       JWT_SECRET: ${JWT_SECRET:-troque-este-segredo-na-vps}
-      ADMIN_NAME: ${ADMIN_NAME:-Administrador}
-      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@realselect.fc}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-realselect2026}
-      CORS_ORIGIN: "*"
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
       PORT: 3333
-    volumes:
-      - realselect-data:/data
-    ports:
-      - "3333:3333"
+    networks:
+      - realselect
+      - postgres
     restart: unless-stopped
 
   web:
+    container_name: realselect-web
     build:
       context: .
       dockerfile: apps/web/Dockerfile
     environment:
       API_PROXY_URL: http://api:3333
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     depends_on:
       - api
+    networks:
+      - realselect
     restart: unless-stopped
 
-volumes:
-  realselect-data:
+networks:
+  realselect:
+  postgres:
+    external: true
+    name: ${POSTGRES_NETWORK:?Defina POSTGRES_NETWORK no .env}

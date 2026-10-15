@@ -1,6 +1,5 @@
 import cors from "@fastify/cors";
 import Fastify from "fastify";
-import { ensureAdmin } from "./lib/auth.js";
 import { prisma } from "./lib/prisma.js";
 import { seedChampionship } from "./seed.js";
 import { adminRoutes } from "./routes/admin.js";
@@ -17,7 +16,6 @@ export async function start() {
     reply.code(500).send({ message: "Erro interno. Tente de novo." });
   });
 
-  await ensureAdmin();
   const imported = await seedChampionship(false);
   if (imported) app.log.info("Histórico da planilha importado.");
 

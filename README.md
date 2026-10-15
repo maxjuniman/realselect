@@ -31,19 +31,31 @@ Troque a senha em `apps/api/.env` antes de publicar.
 
 ## Publicar na VPS
 
-É preciso Docker na VPS. Na pasta do projeto:
+O banco `realselect` fica no Postgres que já roda no container `maxfoot-postgres`. A API entra na mesma rede Docker. O site escuta só em `127.0.0.1:3000`, para não disputar a porta 3333 do Maxfoot.
+
+O código fica em `/opt/realselect/app/docker`, no mesmo formato de `/opt/maxfoot/app/docker`. O Nginx fica em `/etc/nginx/sites-enabled/realselect`, ao lado do arquivo `maxfoot`. Até existir domínio, o site responde em `http://167.233.239.13:8082`. A porta 80 continua com o site que já usa esse IP.
+
+Na VPS, o `.env` dessa pasta fica assim:
 
 ```bash
-docker compose up -d --build
+DATABASE_URL=postgresql://realselect:SENHA@maxfoot-postgres:5432/realselect
+POSTGRES_NETWORK=maxfoot_maxfoot
+JWT_SECRET=um-segredo-longo
 ```
 
-O site fica na porta 3000 e a API na 3333. Aponte o domínio para a porta 3000. O banco fica no volume `realselect-data`.
-
-Defina senha e segredo no ambiente da VPS:
+`SENHA` é a senha do usuário `realselect` no Postgres. `JWT_SECRET` é um texto longo só da API. Gere com `openssl rand -hex 32`. Quem entra no painel fica na tabela `User`, com a senha criptografada. O primeiro usuário, e os próximos, são criados assim, com o container no ar:
 
 ```bash
-JWT_SECRET=um-segredo-longo ADMIN_PASSWORD=sua-senha docker compose up -d --build
+docker exec -it realselect-api node dist/create-user.js "Seu Nome" "seu@email.com" "senha-do-painel"
 ```
+
+`POSTGRES_NETWORK` é o nome que aparece em:
+
+```bash
+docker inspect maxfoot-postgres --format '{{range $k, $v := .NetworkSettings.Networks}}{{$k}}{{println}}{{end}}'
+```
+
+Cada push na `master` faz o build e, em seguida, o deploy por SSH. Na primeira subida, a API cria as tabelas e importa o histórico da planilha.
 
 ## O que ficou de fora
 
