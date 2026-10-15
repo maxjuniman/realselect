@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import styled from "styled-components";
 import { clientApi } from "@/lib/client";
 import { formatDiff, nextTuesday, seasonCodeFromDate } from "@/lib/format";
 import {
@@ -16,7 +17,6 @@ import {
   Muted,
   Person,
   Picker,
-  Pill,
   PrimaryButton,
   ScoreBox,
   ScorePad,
@@ -24,7 +24,6 @@ import {
   Search,
   Select,
   Stack,
-  Stepper,
   TextInput,
   Times,
   Toolbar,
@@ -51,6 +50,7 @@ export function MatchForm({
   const [scoreB, setScoreB] = useState(initial?.scoreB ?? 0);
   const [keepDiff, setKeepDiff] = useState(Boolean(initial && initial.origin === "planilha" && initial.scoreA === null));
   const [professorId, setProfessorId] = useState(initial?.professor?.id ?? "");
+  const [colorA, setColorA] = useState<"verde" | "roxo">(initial?.colorA === "roxo" ? "roxo" : "verde");
   const [showInactive, setShowInactive] = useState(false);
   const [query, setQuery] = useState("");
   const [error, setError] = useState("");
@@ -118,6 +118,7 @@ export function MatchForm({
         goalDiffA: lineupOnly ? 0 : initial?.goalDiffA ?? 0,
         professorId: lineupOnly ? null : professorId || null,
         scheduled: lineupOnly,
+        colorA,
         appearances: [
           ...teamA.map((player) => ({ playerId: player.id, team: "A" })),
           ...teamB.map((player) => ({ playerId: player.id, team: "B" })),
@@ -224,8 +225,15 @@ export function MatchForm({
         </Check>
       </Toolbar>
 
+      <ColorRow>
+        <span>Cor do time A</span>
+        <ColorBall type="button" $tone="verde" $on={colorA === "verde"} aria-pressed={colorA === "verde"} aria-label="Time A verde" onClick={() => setColorA("verde")} />
+        <ColorBall type="button" $tone="roxo" $on={colorA === "roxo"} aria-pressed={colorA === "roxo"} aria-label="Time A roxo" onClick={() => setColorA("roxo")} />
+        <Muted as="span">O time B fica {colorA === "verde" ? "roxo" : "verde"}.</Muted>
+      </ColorRow>
+
       <Picker>
-        <TeamBucket title="Time A" count={teamA.length} tone="a" players={teamA} goals={goals} assists={assists} onMove={setSide} onBump={bump} events={!lineupOnly} />
+        <TeamBucket title="Time A" count={teamA.length} tone={colorA} players={teamA} goals={goals} assists={assists} onMove={setSide} onBump={bump} events={!lineupOnly} />
         <Bucket>
           <h3>Fora</h3>
           {visible
@@ -243,7 +251,7 @@ export function MatchForm({
               </Person>
             ))}
         </Bucket>
-        <TeamBucket title="Time B" count={teamB.length} tone="b" players={teamB} goals={goals} assists={assists} onMove={setSide} onBump={bump} events={!lineupOnly} />
+        <TeamBucket title="Time B" count={teamB.length} tone={colorA === "verde" ? "roxo" : "verde"} players={teamB} goals={goals} assists={assists} onMove={setSide} onBump={bump} events={!lineupOnly} />
       </Picker>
 
       {lineupOnly ? null : (
@@ -291,7 +299,7 @@ function TeamBucket({
 }: {
   title: string;
   count: number;
-  tone: "a" | "b";
+  tone: "verde" | "roxo";
   players: PlayerRef[];
   goals: Record<string, number>;
   assists: Record<string, number>;
@@ -302,7 +310,7 @@ function TeamBucket({
   return (
     <Bucket>
       <h3>
-        <Pill $tone={tone}>{title}</Pill>
+        <TeamName $tone={tone}>{title}</TeamName>
         <Muted as="span">{count}</Muted>
       </h3>
       {players
@@ -312,22 +320,117 @@ function TeamBucket({
           <Person key={player.id}>
             <div>
               <b>{player.name}</b>
-              {events ? <Stepper>
-                <span>G</span>
-                <button type="button" onClick={() => onBump("goals", player.id, -1)}>-</button>
-                <span>{goals[player.id] ?? 0}</span>
-                <button type="button" onClick={() => onBump("goals", player.id, 1)}>+</button>
-                <span>A</span>
-                <button type="button" onClick={() => onBump("assists", player.id, -1)}>-</button>
-                <span>{assists[player.id] ?? 0}</span>
-                <button type="button" onClick={() => onBump("assists", player.id, 1)}>+</button>
-              </Stepper> : null}
+              {events ? (
+                <Counters>
+                  <span>Gol</span>
+                  <Ball type="button" $tone={tone} aria-label={`Tirar gol de ${player.name}`} onClick={() => onBump("goals", player.id, -1)}>
+                    −
+                  </Ball>
+                  <Count>{goals[player.id] ?? 0}</Count>
+                  <Ball type="button" $tone={tone} $fill aria-label={`Adicionar gol de ${player.name}`} onClick={() => onBump("goals", player.id, 1)}>
+                    +
+                  </Ball>
+                  <span>Assist.</span>
+                  <Ball type="button" $tone={tone} aria-label={`Tirar assistência de ${player.name}`} onClick={() => onBump("assists", player.id, -1)}>
+                    −
+                  </Ball>
+                  <Count>{assists[player.id] ?? 0}</Count>
+                  <Ball type="button" $tone={tone} $fill aria-label={`Adicionar assistência de ${player.name}`} onClick={() => onBump("assists", player.id, 1)}>
+                    +
+                  </Ball>
+                </Counters>
+              ) : null}
             </div>
-            <MiniButton type="button" onClick={() => onMove(player.id, "out")}>
-              Tirar
-            </MiniButton>
+            <RemoveButton type="button" aria-label={`Tirar ${player.name}`} onClick={() => onMove(player.id, "out")}>
+              ×
+            </RemoveButton>
           </Person>
         ))}
     </Bucket>
   );
 }
+
+const paint = {
+  verde: "#008000",
+  roxo: "#993aa2",
+};
+
+const ColorRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+`;
+
+const ColorBall = styled.button<{ $tone: "verde" | "roxo"; $on: boolean }>`
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  padding: 0;
+  cursor: pointer;
+  border: 2px solid ${({ $tone }) => paint[$tone]};
+  background: ${({ $tone, $on }) => ($on ? paint[$tone] : "transparent")};
+  box-shadow: ${({ $on, $tone }) => ($on ? `0 0 0 3px ${$tone === "verde" ? "#00800033" : "#993aa233"}` : "none")};
+`;
+
+const TeamName = styled.span<{ $tone: "verde" | "roxo" }>`
+  border-bottom: 3px solid ${({ $tone }) => paint[$tone]};
+  padding-bottom: 4px;
+`;
+
+const Counters = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+  span {
+    color: ${({ theme }) => theme.muted};
+    font-size: 13px;
+    font-weight: 600;
+  }
+`;
+
+const Count = styled.b`
+  min-width: 16px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+`;
+
+const Ball = styled.button<{ $tone: "verde" | "roxo"; $fill?: boolean }>`
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+  border: 2px solid ${({ $tone }) => paint[$tone]};
+  background: ${({ $tone, $fill }) => ($fill ? paint[$tone] : "transparent")};
+  color: ${({ $tone, $fill }) => ($fill ? "#ffffff" : paint[$tone])};
+  &:focus-visible {
+    outline: 2px solid ${({ $tone }) => paint[$tone]};
+    outline-offset: 2px;
+  }
+`;
+
+const RemoveButton = styled.button`
+  width: 36px;
+  height: 36px;
+  border: 0;
+  background: transparent;
+  color: ${({ theme }) => theme.ink};
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+  &:hover {
+    color: ${({ theme }) => theme.loss};
+  }
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.purpleDeep};
+    outline-offset: 2px;
+  }
+`;

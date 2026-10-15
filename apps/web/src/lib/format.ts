@@ -15,6 +15,11 @@ export function formatShortDate(iso: string) {
   return `${day}/${month}/${year}`;
 }
 
+export function formatTinyDate(iso: string) {
+  const [year, month, day] = iso.split("-");
+  return `${day}/${month}/${year.slice(2)}`;
+}
+
 export function formatPercent(value: number) {
   return new Intl.NumberFormat("pt-BR", {
     style: "percent",

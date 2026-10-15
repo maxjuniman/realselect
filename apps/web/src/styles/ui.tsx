@@ -316,6 +316,10 @@ export const List = styled.div`
   flex-direction: column;
 `;
 
+export const ScoreText = styled.strong<{ $tone: "verde" | "roxo" | "empate" }>`
+  color: ${({ $tone, theme }) => ($tone === "verde" ? theme.gold : $tone === "roxo" ? theme.purple : theme.ink)};
+`;
+
 export const ListLink = styled(Link)`
   display: grid;
   grid-template-columns: minmax(260px, 34%) 1fr auto;

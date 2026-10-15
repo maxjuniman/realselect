@@ -23,6 +23,7 @@ export const matchInputSchema = z.object({
   goalDiffA: z.number().int().min(-99).max(99).optional(),
   professorId: z.string().min(1).nullable().optional(),
   scheduled: z.boolean().optional(),
+  colorA: z.enum(["verde", "roxo"]).optional(),
   appearances: z.array(appearanceSchema).min(2),
   events: z.array(eventSchema).default([]),
 });
@@ -98,6 +99,7 @@ export async function saveMatch(input: MatchInput, matchId?: string): Promise<Sa
     professorId: input.professorId || null,
     origin: "manual" as const,
     scheduled: Boolean(input.scheduled) && !hasScore,
+    ...(input.colorA ? { colorA: input.colorA } : {}),
   };
 
   const mergedEvents = new Map<string, { playerId: string | null; type: string; count: number }>();
@@ -182,6 +184,7 @@ export function presentMatch(match: MatchWithRelations) {
     goalDiffA: match.goalDiffA,
     scoreLabel: match.scheduled ? "Escalação" : scoreLine(match.scoreA, match.scoreB, match.goalDiffA),
     scheduled: match.scheduled,
+    colorA: match.colorA === "roxo" ? "roxo" : "verde",
     origin: match.origin,
     professor: match.professor ? { id: match.professor.id, name: match.professor.name } : null,
     ownGoals: match.events.filter((event) => event.type === "own_goal").reduce((sum, event) => sum + event.count, 0),

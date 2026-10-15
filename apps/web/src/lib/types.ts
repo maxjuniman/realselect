@@ -55,6 +55,7 @@ export type MatchDetail = {
   scoreLabel: string;
   origin: string;
   scheduled: boolean;
+  colorA: "verde" | "roxo";
   professor: { id: string; name: string } | null;
   ownGoals: number;
   teamA: LinePlayer[];

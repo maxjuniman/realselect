@@ -51,6 +51,7 @@ model Match {
   professor   Player?           @relation("Professor", fields: [professorId], references: [id])
   origin      String            @default("manual")
   scheduled   Boolean           @default(false)
+  colorA      String            @default("verde")
   appearances MatchAppearance[]
   events      MatchEvent[]
   createdAt   DateTime          @default(now())
