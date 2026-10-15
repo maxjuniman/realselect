@@ -5,13 +5,14 @@ import { useRouter } from "next/navigation";
 import styled from "styled-components";
 import { clientApi } from "@/lib/client";
 import { formatDiff, nextTuesday, seasonCodeFromDate } from "@/lib/format";
+import { positionRank } from "@/lib/roster";
 import {
   Actions,
   Bucket,
   Check,
   DangerButton,
-  ErrorText,
   Field,
+  GhostButton,
   Guest,
   MiniButton,
   Muted,
@@ -53,8 +54,8 @@ export function MatchForm({
   const [colorA, setColorA] = useState<"verde" | "roxo">(initial?.colorA === "roxo" ? "roxo" : "verde");
   const [showInactive, setShowInactive] = useState(false);
   const [query, setQuery] = useState("");
-  const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState<Notice>(null);
   const [sides, setSides] = useState<Record<string, Side>>(() => {
     const map: Record<string, Side> = {};
     initial?.teamA.forEach((player) => (map[player.id] = "A"));
@@ -81,7 +82,7 @@ export function MatchForm({
     return players
       .filter((player) => showInactive || player.active || sides[player.id])
       .filter((player) => !term || player.name.toLocaleLowerCase("pt-BR").includes(term))
-      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+      .sort(byPosition);
   }, [players, query, showInactive, sides]);
 
   const teamA = players.filter((player) => sides[player.id] === "A");
@@ -98,16 +99,19 @@ export function MatchForm({
     setter((current) => ({ ...current, [id]: Math.max(0, (current[id] ?? 0) + delta) }));
   }
 
-  async function save() {
-    setError("");
+  function askSave() {
     if (!teamA.length || !teamB.length) {
-      setError("Coloque pelo menos um jogador em cada time.");
+      setNotice({ step: "result", ok: false, message: "Coloque pelo menos um jogador em cada time." });
       return;
     }
     if (!lineupOnly && !keepDiff && (Number.isNaN(scoreA) || Number.isNaN(scoreB))) {
-      setError("Informe o placar dos dois times.");
+      setNotice({ step: "result", ok: false, message: "Informe o placar dos dois times." });
       return;
     }
+    setNotice({ step: "confirm", action: "save" });
+  }
+
+  async function save() {
     setSaving(true);
     try {
       const body = {
@@ -133,26 +137,37 @@ export function MatchForm({
       const saved = initial
         ? await clientApi<MatchDetail>(`/admin/matches/${initial.id}`, { method: "PATCH", body: JSON.stringify(body) })
         : await clientApi<MatchDetail>("/admin/matches", { method: "POST", body: JSON.stringify(body) });
-      router.push(`/admin/jogos/${saved.id}`);
-      router.refresh();
+      setNotice({
+        step: "result",
+        ok: true,
+        message: lineupOnly ? "Escalação salva." : "Jogo salvo.",
+        href: `/admin/jogos/${saved.id}`,
+      });
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Não foi possível salvar.");
+      setNotice({ step: "result", ok: false, message: caught instanceof Error ? caught.message : "Não foi possível salvar." });
     } finally {
       setSaving(false);
     }
   }
 
   async function remove() {
-    if (!initial || !confirm("Apagar este jogo da classificação?")) return;
+    if (!initial) return;
     setSaving(true);
     try {
       await clientApi(`/admin/matches/${initial.id}`, { method: "DELETE" });
-      router.push("/admin/jogos");
-      router.refresh();
+      setNotice({ step: "result", ok: true, message: "Jogo apagado.", href: "/admin/jogos" });
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Não foi possível apagar.");
+      setNotice({ step: "result", ok: false, message: caught instanceof Error ? caught.message : "Não foi possível apagar." });
       setSaving(false);
     }
+  }
+
+  function closeNotice() {
+    if (notice?.step === "result" && notice.ok && notice.href) {
+      router.push(notice.href);
+      router.refresh();
+    }
+    setNotice(null);
   }
 
   return (
@@ -261,7 +276,7 @@ export function MatchForm({
           <option value="">Sem professor</option>
           {playing
             .slice()
-            .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
+            .sort(byPosition)
             .map((player) => (
               <option key={player.id} value={player.id}>
                 {player.name}
@@ -271,19 +286,55 @@ export function MatchForm({
       </Field>
       )}
 
-      {error ? <ErrorText>{error}</ErrorText> : null}
       <Actions>
-        <PrimaryButton type="button" disabled={saving} onClick={save}>
+        <PrimaryButton type="button" disabled={saving} onClick={askSave}>
           {saving ? "Salvando..." : lineupOnly ? "Salvar escalação" : "Salvar jogo"}
         </PrimaryButton>
         {initial ? (
-          <DangerButton type="button" disabled={saving} onClick={remove}>
+          <DangerButton type="button" disabled={saving} onClick={() => setNotice({ step: "confirm", action: "delete" })}>
             Apagar jogo
           </DangerButton>
         ) : null}
       </Actions>
+      {notice ? (
+        <Backdrop onMouseDown={() => (notice.step === "confirm" ? setNotice(null) : closeNotice())}>
+          <Dialog role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
+            {notice.step === "confirm" ? (
+              <>
+                <h2>{notice.action === "delete" ? "Apagar este jogo?" : lineupOnly ? "Salvar esta escalação?" : "Salvar este jogo?"}</h2>
+                <Muted>{notice.action === "delete" ? "Ele sai da classificação." : "Confira times, placar e professor antes de confirmar."}</Muted>
+                <Actions>
+                  <GhostButton type="button" onClick={() => setNotice(null)}>
+                    Cancelar
+                  </GhostButton>
+                  <PrimaryButton type="button" disabled={saving} onClick={notice.action === "delete" ? remove : save}>
+                    {saving ? "Salvando..." : "Confirmar"}
+                  </PrimaryButton>
+                </Actions>
+              </>
+            ) : (
+              <>
+                <h2>{notice.ok ? "Pronto" : "Não deu certo"}</h2>
+                <Muted>{notice.message}</Muted>
+                <PrimaryButton type="button" onClick={closeNotice}>
+                  Ok
+                </PrimaryButton>
+              </>
+            )}
+          </Dialog>
+        </Backdrop>
+      ) : null}
     </Stack>
   );
+}
+
+type Notice =
+  | { step: "confirm"; action: "save" | "delete" }
+  | { step: "result"; ok: boolean; message: string; href?: string }
+  | null;
+
+function byPosition(a: PlayerRef, b: PlayerRef) {
+  return positionRank(a.positions?.[0]) - positionRank(b.positions?.[0]) || a.name.localeCompare(b.name, "pt-BR");
 }
 
 function TeamBucket({
@@ -315,36 +366,44 @@ function TeamBucket({
       </h3>
       {players
         .slice()
-        .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
+        .sort(byPosition)
         .map((player) => (
-          <Person key={player.id}>
-            <div>
+          <Slot key={player.id}>
+            <NameLine>
               <b>{player.name}</b>
-              {events ? (
-                <Counters>
+              <RemoveButton type="button" aria-label={`Tirar ${player.name}`} onClick={() => onMove(player.id, "out")}>
+                ×
+              </RemoveButton>
+            </NameLine>
+            {events ? (
+              <>
+                <StatLine>
                   <span>Gol</span>
-                  <Ball type="button" $tone={tone} aria-label={`Tirar gol de ${player.name}`} onClick={() => onBump("goals", player.id, -1)}>
-                    −
-                  </Ball>
-                  <Count>{goals[player.id] ?? 0}</Count>
-                  <Ball type="button" $tone={tone} $fill aria-label={`Adicionar gol de ${player.name}`} onClick={() => onBump("goals", player.id, 1)}>
-                    +
-                  </Ball>
+                  <Balls>
+                    <Ball type="button" $tone={tone} aria-label={`Tirar gol de ${player.name}`} onClick={() => onBump("goals", player.id, -1)}>
+                      −
+                    </Ball>
+                    <Count>{goals[player.id] ?? 0}</Count>
+                    <Ball type="button" $tone={tone} $fill aria-label={`Adicionar gol de ${player.name}`} onClick={() => onBump("goals", player.id, 1)}>
+                      +
+                    </Ball>
+                  </Balls>
+                </StatLine>
+                <StatLine>
                   <span>Assist.</span>
-                  <Ball type="button" $tone={tone} aria-label={`Tirar assistência de ${player.name}`} onClick={() => onBump("assists", player.id, -1)}>
-                    −
-                  </Ball>
-                  <Count>{assists[player.id] ?? 0}</Count>
-                  <Ball type="button" $tone={tone} $fill aria-label={`Adicionar assistência de ${player.name}`} onClick={() => onBump("assists", player.id, 1)}>
-                    +
-                  </Ball>
-                </Counters>
-              ) : null}
-            </div>
-            <RemoveButton type="button" aria-label={`Tirar ${player.name}`} onClick={() => onMove(player.id, "out")}>
-              ×
-            </RemoveButton>
-          </Person>
+                  <Balls>
+                    <Ball type="button" $tone={tone} aria-label={`Tirar assistência de ${player.name}`} onClick={() => onBump("assists", player.id, -1)}>
+                      −
+                    </Ball>
+                    <Count>{assists[player.id] ?? 0}</Count>
+                    <Ball type="button" $tone={tone} $fill aria-label={`Adicionar assistência de ${player.name}`} onClick={() => onBump("assists", player.id, 1)}>
+                      +
+                    </Ball>
+                  </Balls>
+                </StatLine>
+              </>
+            ) : null}
+          </Slot>
         ))}
     </Bucket>
   );
@@ -378,17 +437,35 @@ const TeamName = styled.span<{ $tone: "verde" | "roxo" }>`
   padding-bottom: 4px;
 `;
 
-const Counters = styled.div`
+const Slot = styled.div`
+  padding: 8px 0;
+  border-bottom: 1px solid ${({ theme }) => theme.line};
+`;
+
+const NameLine = styled.div`
   display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: space-between;
+  gap: 8px;
+`;
+
+const StatLine = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin-top: 6px;
-  flex-wrap: wrap;
   span {
     color: ${({ theme }) => theme.muted};
     font-size: 13px;
     font-weight: 600;
   }
+`;
+
+const Balls = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 6px;
 `;
 
 const Count = styled.b`
@@ -414,6 +491,34 @@ const Ball = styled.button<{ $tone: "verde" | "roxo"; $fill?: boolean }>`
   &:focus-visible {
     outline: 2px solid ${({ $tone }) => paint[$tone]};
     outline-offset: 2px;
+  }
+`;
+
+const Backdrop = styled.div`
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(28, 16, 34, 0.46);
+`;
+
+const Dialog = styled.div`
+  width: min(420px, 100%);
+  background: ${({ theme }) => theme.paper};
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  h2 {
+    margin: 0;
+    font-family: ${({ theme }) => theme.display};
+    font-stretch: 87.5%;
+    font-weight: 700;
+    font-size: 36px;
+    letter-spacing: -0.03em;
+    line-height: 0.95;
   }
 `;
 
