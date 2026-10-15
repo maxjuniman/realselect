@@ -94,7 +94,7 @@ jobs:
           command_timeout: 25m
           debug: true
           envs: DEPLOY_BRANCH,APP_DIR
-          script_stop: true
+          script_stop: false
           script_path: scripts/vps-deploy.sh
 
       - name: Wait before SSH retry 2
@@ -122,7 +122,7 @@ jobs:
           command_timeout: 25m
           debug: true
           envs: DEPLOY_BRANCH,APP_DIR
-          script_stop: true
+          script_stop: false
           script_path: scripts/vps-deploy.sh
 
       - name: Wait before SSH retry 3
@@ -149,7 +149,7 @@ jobs:
           command_timeout: 25m
           debug: true
           envs: DEPLOY_BRANCH,APP_DIR
-          script_stop: true
+          script_stop: false
           script_path: scripts/vps-deploy.sh
 
       - name: Ensure deploy succeeded
