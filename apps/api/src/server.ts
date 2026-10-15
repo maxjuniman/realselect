@@ -1,6 +1,7 @@
 import cors from "@fastify/cors";
 import Fastify from "fastify";
 import { prisma } from "./lib/prisma.js";
+import { cleanPositions } from "./lib/roster.js";
 import { seedChampionship } from "./seed.js";
 import { adminRoutes } from "./routes/admin.js";
 import { publicRoutes } from "./routes/public.js";
@@ -23,6 +24,12 @@ export async function start() {
     data: { squad: "suplente" },
   });
   if (moved.count) app.log.info({ count: moved.count }, "Avulsos antigos foram para o grupo de suplentes.");
+  const roster = await prisma.player.findMany({ select: { id: true, positions: true } });
+  for (const player of roster) {
+    const positions = cleanPositions(player.positions);
+    const same = positions.length === player.positions.length && positions.every((item, index) => item === player.positions[index]);
+    if (!same) await prisma.player.update({ where: { id: player.id }, data: { positions } });
+  }
 
   const port = Number(process.env.PORT || 3333);
   await app.listen({ port, host: "0.0.0.0" });
