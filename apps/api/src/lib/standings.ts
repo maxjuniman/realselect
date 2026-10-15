@@ -15,7 +15,7 @@ export async function getSeason(code?: string | null) {
 export async function standingsFor(seasonId: string) {
   const [appearances, events, season] = await Promise.all([
     prisma.matchAppearance.findMany({
-      where: { match: { seasonId } },
+      where: { match: { seasonId, scheduled: false } },
       include: {
         player: true,
         match: { select: { playedOn: true, goalDiffA: true } },
@@ -23,7 +23,7 @@ export async function standingsFor(seasonId: string) {
     }),
     prisma.matchEvent.groupBy({
       by: ["playerId", "type"],
-      where: { match: { seasonId }, playerId: { not: null } },
+      where: { match: { seasonId, scheduled: false }, playerId: { not: null } },
       _sum: { count: true },
     }),
     prisma.season.findUniqueOrThrow({ where: { id: seasonId } }),
@@ -109,7 +109,7 @@ export async function standingsFor(seasonId: string) {
 export async function scorersFor(seasonId: string) {
   const season = await prisma.season.findUniqueOrThrow({ where: { id: seasonId } });
   const events = await prisma.matchEvent.findMany({
-    where: { match: { seasonId } },
+    where: { match: { seasonId, scheduled: false } },
     include: { player: true },
   });
   const rows = new Map<string, { player: { id: string; name: string; guest: boolean }; goals: number; assists: number }>();

@@ -7,7 +7,7 @@ import { AdminLink, AdminNav, AdminShell, GhostButton, Muted } from "@/styles/ui
 
 const links = [
   { href: "/admin", label: "Resumo" },
-  { href: "/admin/jogo/novo", label: "Nova terça" },
+  { href: "/admin/jogos", label: "Jogos" },
   { href: "/admin/jogadores", label: "Jogadores" },
   { href: "/admin/temporadas", label: "Temporadas" },
 ];
@@ -31,7 +31,13 @@ export default function PainelLayout({ children }: { children: React.ReactNode }
           <AdminLink
             key={link.href}
             href={link.href}
-            $active={link.href === "/admin" ? pathname === "/admin" : pathname.startsWith(link.href)}
+            $active={
+              link.href === "/admin"
+                ? pathname === "/admin"
+                : link.href === "/admin/jogos"
+                  ? pathname.startsWith("/admin/jogos") || pathname.startsWith("/admin/jogo/")
+                  : pathname.startsWith(link.href)
+            }
           >
             {link.label}
           </AdminLink>

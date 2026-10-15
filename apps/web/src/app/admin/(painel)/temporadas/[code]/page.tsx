@@ -130,7 +130,7 @@ export default function SeasonDataPage() {
           {matches.length ? (
             <List>
               {matches.map((match) => (
-                <ListLink key={match.id} href={`/admin/jogo/${match.id}`}>
+                <ListLink key={match.id} href={`/admin/jogos/${match.id}`}>
                   <span>{formatLongDate(match.playedOn)}</span>
                   <strong>{match.scoreLabel}</strong>
                   <Muted as="span">{match.professor ? `Prof. ${match.professor.name}` : `${match.teamA.length} x ${match.teamB.length}`}</Muted>

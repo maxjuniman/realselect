@@ -13,7 +13,7 @@ export default async function AdminHome() {
     <Stack>
       <PanelHead $flush>
         <PageTitle>Painel</PageTitle>
-        <ButtonLink href="/admin/jogo/novo">Lançar terça</ButtonLink>
+        <ButtonLink href="/admin/jogos">Jogos</ButtonLink>
       </PanelHead>
       <StatGrid>
         <Stat><b>{table.season.name}</b><span>Temporada atual</span></Stat>
@@ -25,7 +25,7 @@ export default async function AdminHome() {
         <PanelHead><SectionTitle>Últimos jogos</SectionTitle></PanelHead>
         <List>
           {matches.map((match) => (
-            <ListLink key={match.id} href={`/admin/jogo/${match.id}`}>
+            <ListLink key={match.id} href={`/admin/jogos/${match.id}`}>
               <span>{formatShortDate(match.playedOn)}</span>
               <strong>{match.scoreLabel}</strong>
               <span>Editar</span>

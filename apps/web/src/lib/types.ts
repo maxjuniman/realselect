@@ -54,6 +54,7 @@ export type MatchDetail = {
   goalDiffA: number;
   scoreLabel: string;
   origin: string;
+  scheduled: boolean;
   professor: { id: string; name: string } | null;
   ownGoals: number;
   teamA: LinePlayer[];

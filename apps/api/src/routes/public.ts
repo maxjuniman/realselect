@@ -92,7 +92,7 @@ export async function publicRoutes(app: FastifyInstance) {
         })
         .filter((row): row is NonNullable<typeof row> => Boolean(row))
         .sort((a, b) => b.season.year - a.season.year || b.season.half - a.season.half),
-      matches: appearances.map((item) => {
+      matches: appearances.filter((item) => !item.match.scheduled).map((item) => {
         const score = playerScore(item.team as "A" | "B", item.match.goalDiffA);
         const goals = item.match.events.filter((event) => event.type === "goal").reduce((sum, event) => sum + event.count, 0);
         const assists = item.match.events.filter((event) => event.type === "assist").reduce((sum, event) => sum + event.count, 0);
@@ -119,6 +119,7 @@ export async function publicRoutes(app: FastifyInstance) {
   app.get<{ Querystring: { scope?: string } }>("/attendance", async (request) => {
     const scope = request.query.scope === "year" ? "year" : "last10";
     const matches = await prisma.match.findMany({
+      where: { scheduled: false },
       orderBy: { playedOn: "desc" },
       include: { appearances: { include: { player: true } } },
     });

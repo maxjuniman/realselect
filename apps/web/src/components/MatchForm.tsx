@@ -37,17 +37,19 @@ export function MatchForm({
   players,
   seasons,
   initial,
+  lineupOnly = false,
 }: {
   players: PlayerRef[];
   seasons: Season[];
   initial?: MatchDetail;
+  lineupOnly?: boolean;
 }) {
   const router = useRouter();
   const [playedOn, setPlayedOn] = useState(initial?.playedOn ?? nextTuesday());
   const [seasonCode, setSeasonCode] = useState(initial?.season.code ?? seasonCodeFromDate(nextTuesday()));
   const [scoreA, setScoreA] = useState(initial?.scoreA ?? 0);
   const [scoreB, setScoreB] = useState(initial?.scoreB ?? 0);
-  const [keepDiff, setKeepDiff] = useState(initial ? initial.scoreA === null : false);
+  const [keepDiff, setKeepDiff] = useState(Boolean(initial && initial.origin === "planilha" && initial.scoreA === null));
   const [professorId, setProfessorId] = useState(initial?.professor?.id ?? "");
   const [showInactive, setShowInactive] = useState(false);
   const [query, setQuery] = useState("");
@@ -102,7 +104,7 @@ export function MatchForm({
       setError("Coloque pelo menos um jogador em cada time.");
       return;
     }
-    if (!keepDiff && (Number.isNaN(scoreA) || Number.isNaN(scoreB))) {
+    if (!lineupOnly && !keepDiff && (Number.isNaN(scoreA) || Number.isNaN(scoreB))) {
       setError("Informe o placar dos dois times.");
       return;
     }
@@ -111,15 +113,16 @@ export function MatchForm({
       const body = {
         playedOn,
         seasonCode,
-        scoreA: keepDiff ? null : scoreA,
-        scoreB: keepDiff ? null : scoreB,
-        goalDiffA: initial?.goalDiffA ?? 0,
-        professorId: professorId || null,
+        scoreA: lineupOnly || keepDiff ? null : scoreA,
+        scoreB: lineupOnly || keepDiff ? null : scoreB,
+        goalDiffA: lineupOnly ? 0 : initial?.goalDiffA ?? 0,
+        professorId: lineupOnly ? null : professorId || null,
+        scheduled: lineupOnly,
         appearances: [
           ...teamA.map((player) => ({ playerId: player.id, team: "A" })),
           ...teamB.map((player) => ({ playerId: player.id, team: "B" })),
         ],
-        events: playing.flatMap((player) => {
+        events: lineupOnly ? [] : playing.flatMap((player) => {
           const items = [];
           if (goals[player.id]) items.push({ playerId: player.id, type: "goal", count: goals[player.id] });
           if (assists[player.id]) items.push({ playerId: player.id, type: "assist", count: assists[player.id] });
@@ -129,7 +132,7 @@ export function MatchForm({
       const saved = initial
         ? await clientApi<MatchDetail>(`/admin/matches/${initial.id}`, { method: "PATCH", body: JSON.stringify(body) })
         : await clientApi<MatchDetail>("/admin/matches", { method: "POST", body: JSON.stringify(body) });
-      router.push(`/jogos/${saved.id}`);
+      router.push(`/admin/jogos/${saved.id}`);
       router.refresh();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Não foi possível salvar.");
@@ -143,7 +146,7 @@ export function MatchForm({
     setSaving(true);
     try {
       await clientApi(`/admin/matches/${initial.id}`, { method: "DELETE" });
-      router.push("/admin");
+      router.push("/admin/jogos");
       router.refresh();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Não foi possível apagar.");
@@ -153,6 +156,20 @@ export function MatchForm({
 
   return (
     <Stack>
+      {lineupOnly ? (
+        <Field>
+          Data
+          <TextInput
+            type="date"
+            value={playedOn}
+            onChange={(event) => {
+              setPlayedOn(event.target.value);
+              setSeasonCode(seasonCodeFromDate(event.target.value));
+            }}
+          />
+          {!tuesday ? <Muted>Essa data não é terça. Dá para salvar mesmo assim.</Muted> : null}
+        </Field>
+      ) : (
       <ScorePad>
         <ScoreRow>
           <Field>
@@ -188,13 +205,16 @@ export function MatchForm({
           </Field>
         </ScoreRow>
         {!tuesday ? <Muted>Essa data não é terça. Dá para salvar mesmo assim.</Muted> : null}
-        {initial && initial.scoreA === null ? (
+        {initial && initial.origin === "planilha" && initial.scoreA === null ? (
           <Check>
             <input type="checkbox" checked={keepDiff} onChange={(event) => setKeepDiff(event.target.checked)} />
             Manter só o saldo da planilha ({formatDiff(initial.goalDiffA)} para o time A)
           </Check>
         ) : null}
       </ScorePad>
+      )}
+
+      {initial?.scheduled ? <Muted>Este jogo ainda é só a escalação. Lance o placar, os gols e o professor.</Muted> : null}
 
       <Toolbar $flush>
         <Search placeholder="Buscar jogador" value={query} onChange={(event) => setQuery(event.target.value)} />
@@ -205,7 +225,7 @@ export function MatchForm({
       </Toolbar>
 
       <Picker>
-        <TeamBucket title="Time A" count={teamA.length} tone="a" players={teamA} goals={goals} assists={assists} onMove={setSide} onBump={bump} />
+        <TeamBucket title="Time A" count={teamA.length} tone="a" players={teamA} goals={goals} assists={assists} onMove={setSide} onBump={bump} events={!lineupOnly} />
         <Bucket>
           <h3>Fora</h3>
           {visible
@@ -223,9 +243,10 @@ export function MatchForm({
               </Person>
             ))}
         </Bucket>
-        <TeamBucket title="Time B" count={teamB.length} tone="b" players={teamB} goals={goals} assists={assists} onMove={setSide} onBump={bump} />
+        <TeamBucket title="Time B" count={teamB.length} tone="b" players={teamB} goals={goals} assists={assists} onMove={setSide} onBump={bump} events={!lineupOnly} />
       </Picker>
 
+      {lineupOnly ? null : (
       <Field>
         Professor da rodada
         <Select value={professorId} onChange={(event) => setProfessorId(event.target.value)}>
@@ -240,11 +261,12 @@ export function MatchForm({
             ))}
         </Select>
       </Field>
+      )}
 
       {error ? <ErrorText>{error}</ErrorText> : null}
       <Actions>
         <PrimaryButton type="button" disabled={saving} onClick={save}>
-          {saving ? "Salvando..." : "Salvar jogo"}
+          {saving ? "Salvando..." : lineupOnly ? "Salvar escalação" : "Salvar jogo"}
         </PrimaryButton>
         {initial ? (
           <DangerButton type="button" disabled={saving} onClick={remove}>
@@ -265,6 +287,7 @@ function TeamBucket({
   assists,
   onMove,
   onBump,
+  events = true,
 }: {
   title: string;
   count: number;
@@ -274,6 +297,7 @@ function TeamBucket({
   assists: Record<string, number>;
   onMove: (id: string, side: Side) => void;
   onBump: (kind: "goals" | "assists", id: string, delta: number) => void;
+  events?: boolean;
 }) {
   return (
     <Bucket>
@@ -288,7 +312,7 @@ function TeamBucket({
           <Person key={player.id}>
             <div>
               <b>{player.name}</b>
-              <Stepper>
+              {events ? <Stepper>
                 <span>G</span>
                 <button type="button" onClick={() => onBump("goals", player.id, -1)}>-</button>
                 <span>{goals[player.id] ?? 0}</span>
@@ -297,7 +321,7 @@ function TeamBucket({
                 <button type="button" onClick={() => onBump("assists", player.id, -1)}>-</button>
                 <span>{assists[player.id] ?? 0}</span>
                 <button type="button" onClick={() => onBump("assists", player.id, 1)}>+</button>
-              </Stepper>
+              </Stepper> : null}
             </div>
             <MiniButton type="button" onClick={() => onMove(player.id, "out")}>
               Tirar
