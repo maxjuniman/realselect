@@ -23,15 +23,23 @@ else
   REPO_URL="${REPO_HTTPS}"
 fi
 
-if [ ! -d "${APP_DIR}/.git" ]; then
-  mkdir -p "$(dirname "${APP_DIR}")"
-  git clone --branch "${BRANCH}" "${REPO_URL}" "${APP_DIR}"
+mkdir -p "${APP_DIR}"
+cd "${APP_DIR}"
+
+if [ ! -d .git ]; then
+  echo "Iniciando o repositório em ${APP_DIR}."
+  git init
 fi
 
-cd "${APP_DIR}"
-git remote set-url origin "${REPO_URL}"
+if git remote get-url origin >/dev/null 2>&1; then
+  git remote set-url origin "${REPO_URL}"
+else
+  git remote add origin "${REPO_URL}"
+fi
+
+echo "Baixando a branch ${BRANCH}."
 git fetch origin "${BRANCH}"
-git checkout "${BRANCH}"
+git checkout -B "${BRANCH}" "origin/${BRANCH}"
 git reset --hard "origin/${BRANCH}"
 git remote set-url origin "${REPO_HTTPS}"
 
