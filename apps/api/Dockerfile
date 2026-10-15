@@ -3,6 +3,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY apps/api ./apps/api
 COPY apps/web/package.json ./apps/web/package.json
+ENV DATABASE_URL=postgresql://ci:ci@127.0.0.1:5432/realselect
 RUN npm ci
 RUN npm run build -w api
 WORKDIR /app/apps/api
