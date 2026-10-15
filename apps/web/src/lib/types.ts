@@ -7,7 +7,14 @@ export type Season = {
   isCurrent: boolean;
 };
 
-export type PlayerRef = { id: string; name: string; guest: boolean; active?: boolean };
+export type PlayerRef = {
+  id: string;
+  name: string;
+  guest: boolean;
+  active?: boolean;
+  squad?: "mensalista" | "suplente";
+  positions?: string[];
+};
 
 export type StandingRow = {
   position: number;

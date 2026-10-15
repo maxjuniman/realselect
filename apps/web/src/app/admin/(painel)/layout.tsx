@@ -28,7 +28,11 @@ export default function PainelLayout({ children }: { children: React.ReactNode }
     <AdminShell>
       <AdminNav>
         {links.map((link) => (
-          <AdminLink key={link.href} href={link.href} $active={pathname === link.href}>
+          <AdminLink
+            key={link.href}
+            href={link.href}
+            $active={link.href === "/admin" ? pathname === "/admin" : pathname.startsWith(link.href)}
+          >
             {link.label}
           </AdminLink>
         ))}

@@ -41,7 +41,7 @@ export function StandingsTable({ rows }: { rows: StandingRow[] }) {
                 <Td $place>{row.position}</Td>
                 <Td $name>
                   <NameLink href={`/jogadores/${row.player.id}`}>{row.player.name}</NameLink>
-                  {row.player.guest ? <Guest>avulso</Guest> : null}
+                  {row.player.guest ? <Guest>suplente</Guest> : null}
                 </Td>
                 <Td $num>{row.points}</Td>
                 <Td $num>{row.games}</Td>

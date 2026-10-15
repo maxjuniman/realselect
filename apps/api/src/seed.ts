@@ -52,6 +52,7 @@ export async function seedChampionship(force = false) {
     data: file.players.map((player) => ({
       name: player.name,
       guest: player.guest,
+      squad: player.guest ? "suplente" : "mensalista",
       active: player.guest ? fold(player.name) !== "gol contra" && recent.has(fold(player.name)) : recent.has(fold(player.name)),
     })),
   });

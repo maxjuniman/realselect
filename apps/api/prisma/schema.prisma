@@ -30,6 +30,8 @@ model Player {
   name        String            @unique
   active      Boolean           @default(true)
   guest       Boolean           @default(false)
+  squad       String            @default("mensalista")
+  positions   String[]          @default([])
   appearances MatchAppearance[]
   events      MatchEvent[]
   professorOf Match[]           @relation("Professor")

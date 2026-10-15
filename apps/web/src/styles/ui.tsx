@@ -121,8 +121,33 @@ export const Select = styled.select`
   background: ${({ theme }) => theme.card};
 `;
 
-export const TextInput = styled.input`
+export const TextInput = styled.input<{ $reveal?: boolean }>`
   ${control}
+  padding-right: ${({ $reveal }) => ($reveal ? "44px" : "12px")};
+`;
+
+export const PasswordWrap = styled.span`
+  position: relative;
+  display: block;
+`;
+
+export const RevealButton = styled.button`
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: ${({ theme }) => theme.ink};
+  cursor: pointer;
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.purpleDeep};
+    outline-offset: -2px;
+  }
 `;
 
 export const Field = styled.label`
@@ -501,6 +526,9 @@ export const LoginCard = styled.form`
     ${display}
     font-size: 56px;
     margin: 0;
+  }
+  input {
+    width: 100%;
   }
 `;
 

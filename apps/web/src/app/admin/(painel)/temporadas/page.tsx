@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { clientApi } from "@/lib/client";
-import { ErrorText, GhostButton, Guest, Muted, PageTitle, Panel, PanelHead, PrimaryButton, SplitRow, Stack } from "@/styles/ui";
+import { Actions, ButtonLink, ErrorText, GhostButton, Guest, Muted, PageTitle, Panel, PanelHead, PrimaryButton, SplitRow, Stack } from "@/styles/ui";
 import type { Season } from "@/lib/types";
 
 export default function SeasonsAdminPage() {
@@ -48,13 +48,18 @@ export default function SeasonsAdminPage() {
               <b>{season.name}</b>
               {season.isCurrent ? <Guest>atual</Guest> : null}
             </span>
-            {!season.isCurrent ? (
-              <GhostButton type="button" onClick={() => makeCurrent(season)}>
-                Tornar atual
-              </GhostButton>
-            ) : (
-              <Muted as="span">Em andamento</Muted>
-            )}
+            <Actions>
+              <ButtonLink href={`/admin/temporadas/${season.code}`} $variant="ghost">
+                Ver dados
+              </ButtonLink>
+              {!season.isCurrent ? (
+                <GhostButton type="button" onClick={() => makeCurrent(season)}>
+                  Tornar atual
+                </GhostButton>
+              ) : (
+                <Muted as="span">Em andamento</Muted>
+              )}
+            </Actions>
           </SplitRow>
         ))}
       </Panel>

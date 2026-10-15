@@ -4,11 +4,14 @@ import { login, requireUser } from "../lib/auth.js";
 import { seasonFromCode } from "../lib/dates.js";
 import { matchInclude, matchInputSchema, presentMatch, saveMatch } from "../lib/matches.js";
 import { prisma } from "../lib/prisma.js";
+import { POSITIONS, SQUADS, cleanPositions } from "../lib/roster.js";
 
 const playerSchema = z.object({
   name: z.string().trim().min(2).max(60),
   active: z.boolean().optional(),
   guest: z.boolean().optional(),
+  squad: z.enum(SQUADS).optional(),
+  positions: z.array(z.enum(POSITIONS)).max(2).optional(),
 });
 
 async function sameName(name: string, ignoreId?: string) {
@@ -36,13 +39,16 @@ export async function adminRoutes(app: FastifyInstance) {
     const user = await requireUser(request, reply);
     if (!user) return;
     const body = playerSchema.safeParse(request.body);
-    if (!body.success) return reply.code(400).send({ message: "Nome inválido." });
+    if (!body.success) return reply.code(400).send({ message: "Confira o nome, o grupo e as posições." });
     if (await sameName(body.data.name)) return reply.code(409).send({ message: "Já existe um jogador com esse nome." });
+    const squad = body.data.squad ?? "mensalista";
     const player = await prisma.player.create({
       data: {
         name: body.data.name.trim(),
         active: body.data.active ?? true,
-        guest: body.data.guest ?? false,
+        squad,
+        guest: body.data.guest ?? squad === "suplente",
+        positions: cleanPositions(body.data.positions ?? []),
       },
     });
     return player;
@@ -62,7 +68,9 @@ export async function adminRoutes(app: FastifyInstance) {
         data: {
           name: body.data.name?.trim(),
           active: body.data.active,
-          guest: body.data.guest,
+          squad: body.data.squad,
+          guest: body.data.squad ? body.data.squad === "suplente" : body.data.guest,
+          positions: body.data.positions ? cleanPositions(body.data.positions) : undefined,
         },
       });
     } catch {

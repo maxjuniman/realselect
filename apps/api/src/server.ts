@@ -18,6 +18,11 @@ export async function start() {
 
   const imported = await seedChampionship(false);
   if (imported) app.log.info("Histórico da planilha importado.");
+  const moved = await prisma.player.updateMany({
+    where: { guest: true, squad: "mensalista" },
+    data: { squad: "suplente" },
+  });
+  if (moved.count) app.log.info({ count: moved.count }, "Avulsos antigos foram para o grupo de suplentes.");
 
   const port = Number(process.env.PORT || 3333);
   await app.listen({ port, host: "0.0.0.0" });

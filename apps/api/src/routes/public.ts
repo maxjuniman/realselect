@@ -17,7 +17,7 @@ export async function publicRoutes(app: FastifyInstance) {
     const players = await prisma.player.findMany({
       where: { name: { not: "Gol contra" } },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, active: true, guest: true },
+      select: { id: true, name: true, active: true, guest: true, squad: true, positions: true },
     });
     return players;
   });
@@ -73,7 +73,14 @@ export async function publicRoutes(app: FastifyInstance) {
     const bySeason = new Map(tables.map((table) => [table.season.id, table]));
 
     return {
-      player: { id: player.id, name: player.name, guest: player.guest, active: player.active },
+      player: {
+        id: player.id,
+        name: player.name,
+        guest: player.guest,
+        active: player.active,
+        squad: player.squad,
+        positions: player.positions,
+      },
       seasons: tables
         .map((table) => {
           const row = table.rows.find((item) => item.player.id === player.id);

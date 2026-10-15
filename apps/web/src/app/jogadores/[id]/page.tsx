@@ -5,7 +5,7 @@ import { List, ListLink, Muted, PageBlock, PageTitle, Panel, PanelHead, SectionT
 import type { StandingRow } from "@/lib/types";
 
 type PlayerPayload = {
-  player: { id: string; name: string; guest: boolean; active: boolean };
+  player: { id: string; name: string; guest: boolean; active: boolean; squad?: string; positions?: string[] };
   seasons: (StandingRow & { season: { code: string; name: string; year: number; half: number } })[];
   matches: {
     id: string;
@@ -38,7 +38,8 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
         <>
           <Muted>
             {current.position}º lugar no {current.season.name}
-            {data.player.guest ? ", como avulso" : ""}.
+            {data.player.positions?.length ? `, ${data.player.positions.join(" e ")}` : ""}
+            {data.player.guest ? ", como suplente" : ""}.
           </Muted>
           <StatGrid>
             <Stat><b>{current.points}</b><span>Pontos</span></Stat>

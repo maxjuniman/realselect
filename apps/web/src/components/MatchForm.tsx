@@ -214,7 +214,7 @@ export function MatchForm({
               <Person key={player.id}>
                 <span>
                   {player.name}
-                  {player.guest ? <Guest>avulso</Guest> : null}
+                  {player.guest ? <Guest>suplente</Guest> : null}
                 </span>
                 <Actions>
                   <MiniButton type="button" onClick={() => setSide(player.id, "A")}>A</MiniButton>

@@ -40,7 +40,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
               <tr key={row.player.id}>
                 <Td $name>
                   <NameLink href={`/jogadores/${row.player.id}`}>{row.player.name}</NameLink>
-                  {row.player.guest ? <Guest>avulso</Guest> : null}
+                  {row.player.guest ? <Guest>suplente</Guest> : null}
                 </Td>
                 <Td $num>{row.games}</Td>
                 <Td>{formatShortDate(row.lastMatch)}</Td>
