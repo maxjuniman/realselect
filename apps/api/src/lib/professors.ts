@@ -87,11 +87,11 @@ export async function professorRoster() {
   return {
     order: turns.map((turn) => turn.player),
     absences: absences.map((absence) => ({ playedOn: dateToIso(absence.playedOn), playerId: absence.playerId })),
-    plans: plans.map((plan) => ({ playedOn: dateToIso(plan.playedOn), playerId: plan.playerId })),
+    plans: plans.map((plan) => ({ playedOn: dateToIso(plan.playedOn), playerId: plan.playerId, cancelled: plan.cancelled })),
   };
 }
 
-export async function saveProfessorPlans(slots: { playedOn: string; playerId: string }[]) {
+export async function saveProfessorPlans(slots: { playedOn: string; playerId: string; cancelled?: boolean }[]) {
   const players = await mensalistas();
   const allowed = new Set(players.map((player) => player.id));
   if (slots.some((slot) => !allowed.has(slot.playerId))) return { ok: false as const, error: "O professor precisa ser mensalista." };
@@ -100,7 +100,7 @@ export async function saveProfessorPlans(slots: { playedOn: string; playerId: st
   await prisma.$transaction([
     prisma.professorPlan.deleteMany(),
     prisma.professorPlan.createMany({
-      data: slots.map((slot) => ({ playedOn: isoToDate(slot.playedOn), playerId: slot.playerId })),
+      data: slots.map((slot) => ({ playedOn: isoToDate(slot.playedOn), playerId: slot.playerId, cancelled: Boolean(slot.cancelled) })),
     }),
   ]);
   return { ok: true as const };

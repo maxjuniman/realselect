@@ -10,7 +10,7 @@ export type Season = {
 export type ProfessorRoster = {
   order: { id: string; name: string; positions: string[] }[];
   absences: { playedOn: string; playerId: string }[];
-  plans?: { playedOn: string; playerId: string }[];
+  plans?: { playedOn: string; playerId: string; cancelled?: boolean }[];
 };
 
 export type PlayerRef = {

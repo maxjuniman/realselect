@@ -9,7 +9,7 @@ import { clientApi } from "@/lib/client";
 import { formatShortDate, seasonCodeFromDate } from "@/lib/format";
 import { placar, winnerTone } from "@/lib/score";
 import type { MatchDetail, ProfessorRoster, Season } from "@/lib/types";
-import { ErrorText, MiniButton, Muted, PageTitle, PanelHead, ScoreText, Select, Stack } from "@/styles/ui";
+import { ErrorText, MiniButton, Muted, PageTitle, PanelHead, ScoreText, SectionTitle, Select, Stack } from "@/styles/ui";
 
 type Turn = ProfessorRoster["order"][number];
 
@@ -37,7 +37,7 @@ function ProfessorsRoster() {
   const params = useSearchParams();
   const [order, setOrder] = useState<Turn[]>([]);
   const [matches, setMatches] = useState<MatchDetail[]>([]);
-  const [plans, setPlans] = useState<{ playedOn: string; playerId: string }[]>([]);
+  const [plans, setPlans] = useState<{ playedOn: string; playerId: string; cancelled?: boolean }[]>([]);
   const [seasons, setSeasons] = useState<Season[]>([]);
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
@@ -66,10 +66,12 @@ function ProfessorsRoster() {
       playedOn: slot.playedOn,
       season: slot.season,
       index: slot.index,
+      cancelled: Boolean(slot.cancelled),
     })),
   ];
   const latestId = [...played].sort((left, right) => right.playedOn.localeCompare(left.playedOn))[0]?.id;
-  const next = order.find((player) => player.id === slots[0]?.playerId) ?? nextInRotation(order, lastProfessorId(matches), []);
+  const upcoming = slots.find((slot) => !slot.cancelled);
+  const next = order.find((player) => player.id === upcoming?.playerId) ?? nextInRotation(order, lastProfessorId(matches), []);
 
   useEffect(() => {
     Promise.all([clientApi<Season[]>("/seasons"), clientApi<MatchDetail[]>("/matches"), clientApi<ProfessorRoster>("/admin/professors")])
@@ -86,7 +88,34 @@ function ProfessorsRoster() {
       });
   }, []);
 
-  async function persist(nextSlots: { playedOn: string; playerId: string }[]) {
+  async function moveOrder(index: number, delta: number) {
+    const target = index + delta;
+    if (target < 0 || target >= order.length || busy) return;
+    const previous = order;
+    const nextOrder = [...order];
+    const item = nextOrder[index];
+    if (!item) return;
+    nextOrder.splice(index, 1);
+    nextOrder.splice(target, 0, item);
+    setOrder(nextOrder);
+    setBusy(true);
+    setError("");
+    try {
+      const saved = await clientApi<ProfessorRoster>("/admin/professors", {
+        method: "PUT",
+        body: JSON.stringify({ playerIds: nextOrder.map((player) => player.id) }),
+      });
+      setOrder(saved.order);
+      setPlans(saved.plans ?? plans);
+    } catch (caught) {
+      setOrder(previous);
+      setError(caught instanceof Error ? caught.message : "Não consegui salvar a ordem.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function persist(nextSlots: { playedOn: string; playerId: string; cancelled?: boolean }[]) {
     if (busy) return;
     setBusy(true);
     setError("");
@@ -122,14 +151,33 @@ function ProfessorsRoster() {
   }
 
   function removeSlot(index: number) {
-    if (!order.length || !slots[index]) return;
-    const people = slots.map((slot) => slot.playerId);
-    people.splice(index, 1);
-    const after = people.at(-1) ?? slots[index].playerId;
+    const current = slots[index];
+    if (!order.length || !current || current.cancelled) return;
+    const openPeople = slots.filter((slot) => !slot.cancelled).map((slot) => slot.playerId);
+    const openAt = slots.filter((slot) => !slot.cancelled).findIndex((slot) => slot.playedOn === current.playedOn);
+    if (openAt < 0) return;
+    openPeople.splice(openAt, 1);
+    const after = openPeople.at(-1) ?? current.playerId;
     const at = order.findIndex((player) => player.id === after);
     const fill = order[(at + 1) % order.length];
-    if (fill) people.push(fill.id);
-    void persist(dates.map((playedOn, position) => ({ playedOn, playerId: people[position] ?? fill?.id ?? "" })).filter((slot) => slot.playerId));
+    if (fill) openPeople.push(fill.id);
+    let cursor = 0;
+    void persist(
+      slots.map((slot) => {
+        if (slot.cancelled) return slot;
+        const playerId = openPeople[cursor] ?? fill?.id ?? slot.playerId;
+        cursor += 1;
+        return { ...slot, playerId };
+      }),
+    );
+  }
+
+  function cancelSlot(index: number) {
+    void persist(slots.map((slot, position) => (position === index ? { ...slot, cancelled: true } : slot)));
+  }
+
+  function restoreSlot(index: number) {
+    void persist(slots.map((slot, position) => (position === index ? { ...slot, cancelled: false } : slot)));
   }
 
   return (
@@ -138,7 +186,7 @@ function ProfessorsRoster() {
         <PageTitle>Professores</PageTitle>
       </PanelHead>
       {ready ? (
-        <Muted>Os jogos já feitos ficam no topo. As terças até 31/12/2026 aparecem em seguida: dá para trocar o professor ou tirar uma ocorrência quando a pessoa for faltar.</Muted>
+        <Muted>A ordem abaixo é o ciclo original. As terças até 31/12/2026 ficam em seguida: dá para trocar, tirar uma ocorrência ou cancelar o jogo.</Muted>
       ) : (
         <Muted>Abrindo a ordem...</Muted>
       )}
@@ -147,7 +195,30 @@ function ProfessorsRoster() {
       {error ? <ErrorText>{error}</ErrorText> : null}
       {ready && !order.length && !error ? <Muted>Nenhum mensalista na ordem.</Muted> : null}
       {order.length ? (
+        <Stack>
+          <SectionTitle>Ordem</SectionTitle>
+          <OrderGrid>
+            {order.map((player, index) => (
+              <OrderLine key={player.id}>
+                <Name>
+                  {index + 1}. {player.name}
+                </Name>
+                <Arrows>
+                  <MiniButton type="button" aria-label={`Subir ${player.name} na ordem`} disabled={busy || index === 0} onClick={() => moveOrder(index, -1)}>
+                    ↑
+                  </MiniButton>
+                  <MiniButton type="button" aria-label={`Descer ${player.name} na ordem`} disabled={busy || index === order.length - 1} onClick={() => moveOrder(index, 1)}>
+                    ↓
+                  </MiniButton>
+                </Arrows>
+              </OrderLine>
+            ))}
+          </OrderGrid>
+        </Stack>
+      ) : null}
+      {order.length ? (
         <Scroll>
+          <SectionTitle>Jogos</SectionTitle>
           <Grid>
             <Head>
               <span>Professor</span>
@@ -163,7 +234,9 @@ function ProfessorsRoster() {
               const season = row.kind === "played" ? row.game.season.code : row.season;
               return (
                 <Line key={row.kind === "played" ? row.game.id : row.playedOn}>
-                  {row.kind === "future" ? (
+                  {row.kind === "future" && row.cancelled ? (
+                    <Name>Sem professor</Name>
+                  ) : row.kind === "future" ? (
                     <Select aria-label={`Professor em ${formatShortDate(row.playedOn)}`} value={row.player.id} disabled={busy} onChange={(event) => changeProfessor(row.index, event.target.value)}>
                       {order.map((player) => (
                         <option key={player.id} value={player.id}>
@@ -179,16 +252,23 @@ function ProfessorsRoster() {
                   {saldo === null ? <span /> : <Result $value={saldo}>{saldo}</Result>}
                   {row.kind === "played" ? <ScoreText $tone={winnerTone(row.game)}>{scoreOf(row.game)}</ScoreText> : <span />}
                   <Arrows>
-                    {row.kind === "future" ? (
+                    {row.kind === "future" && row.cancelled ? (
+                      <MiniButton type="button" aria-label={`Adicionar professor em ${formatShortDate(row.playedOn)}`} disabled={busy} onClick={() => restoreSlot(row.index)}>
+                        Adicionar
+                      </MiniButton>
+                    ) : row.kind === "future" ? (
                       <>
-                        <MiniButton type="button" aria-label={`Subir ${row.player.name} em ${formatShortDate(row.playedOn)}`} disabled={busy || row.index === 0} onClick={() => swap(row.index, -1)}>
+                        <MiniButton type="button" aria-label={`Subir ${row.player.name} em ${formatShortDate(row.playedOn)}`} disabled={busy || row.index === 0 || Boolean(slots[row.index - 1]?.cancelled)} onClick={() => swap(row.index, -1)}>
                           ↑
                         </MiniButton>
-                        <MiniButton type="button" aria-label={`Descer ${row.player.name} em ${formatShortDate(row.playedOn)}`} disabled={busy || row.index === slots.length - 1} onClick={() => swap(row.index, 1)}>
+                        <MiniButton type="button" aria-label={`Descer ${row.player.name} em ${formatShortDate(row.playedOn)}`} disabled={busy || row.index === slots.length - 1 || Boolean(slots[row.index + 1]?.cancelled)} onClick={() => swap(row.index, 1)}>
                           ↓
                         </MiniButton>
                         <MiniButton type="button" aria-label={`Tirar ${row.player.name} em ${formatShortDate(row.playedOn)}`} disabled={busy} onClick={() => removeSlot(row.index)}>
                           Tirar
+                        </MiniButton>
+                        <MiniButton type="button" aria-label={`Cancelar jogo em ${formatShortDate(row.playedOn)}`} disabled={busy} onClick={() => cancelSlot(row.index)}>
+                          Cancelar
                         </MiniButton>
                       </>
                     ) : null}
@@ -207,10 +287,25 @@ const Scroll = styled.div`
   overflow-x: auto;
 `;
 
-const columns = "minmax(160px, 1.6fr) 118px 96px 72px 72px 168px";
+const columns = "minmax(160px, 1.6fr) 118px 96px 72px 72px 280px";
+
+const OrderGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 8px 16px;
+`;
+
+const OrderLine = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 40px;
+  border-bottom: 1px solid ${({ theme }) => theme.line};
+`;
 
 const Grid = styled.div`
-  min-width: 760px;
+  min-width: 860px;
 `;
 
 const Head = styled.div`

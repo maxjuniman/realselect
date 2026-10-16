@@ -154,7 +154,7 @@ export async function adminRoutes(app: FastifyInstance) {
     const body = z
       .object({
         slots: z
-          .array(z.object({ playedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), playerId: z.string().min(1) }))
+          .array(z.object({ playedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), playerId: z.string().min(1), cancelled: z.boolean().optional() }))
           .max(60),
       })
       .safeParse(request.body);

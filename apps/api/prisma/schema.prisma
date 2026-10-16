@@ -58,9 +58,10 @@ model GameAbsence {
 }
 
 model ProfessorPlan {
-  playedOn DateTime @id
-  playerId String
-  player   Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  playedOn  DateTime @id
+  playerId  String
+  cancelled Boolean  @default(false)
+  player    Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
 }
 
 model Match {

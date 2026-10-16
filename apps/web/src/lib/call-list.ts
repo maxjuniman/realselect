@@ -68,14 +68,40 @@ function byQueue(dates: Map<string, string>) {
   };
 }
 
-export function substituteQueue(players: PlayerRef[], matches: MatchDetail[]) {
+function substituteGroups(players: PlayerRef[], matches: MatchDetail[]) {
   const active = players.filter((player) => player.active !== false && isSuplente(player) && player.name.trim().toLocaleLowerCase("pt-BR") !== "gol contra");
   const queue = byQueue(latestDates(matches).playedOn);
-  return [...active.filter(isKeeper).sort(queue), ...active.filter((player) => !isKeeper(player)).sort(queue)];
+  return {
+    keepers: active.filter(isKeeper).sort(queue),
+    field: active.filter((player) => !isKeeper(player)).sort(queue),
+  };
 }
 
-function numbered(players: PlayerRef[]) {
-  return players.map((player, index) => `${index + 1}. ${player.name}`).join("\n");
+export function substituteQueue(players: PlayerRef[], matches: MatchDetail[]) {
+  const groups = substituteGroups(players, matches);
+  return [...groups.keepers, ...groups.field];
+}
+
+export function gameSequence(players: PlayerRef[], matches: MatchDetail[], today = new Date()) {
+  const eligible = players.filter((player) => player.active !== false && player.name.trim().toLocaleLowerCase("pt-BR") !== "gol contra");
+  const played = matches
+    .filter((match) => !match.scheduled)
+    .sort((left, right) => right.playedOn.localeCompare(left.playedOn) || right.id.localeCompare(left.id));
+  const recent = new Set(played.slice(0, 10).map((match) => match.id));
+  const cutoff = localIso(new Date(today.getFullYear(), today.getMonth() - 12, today.getDate()));
+  const totals = new Map(eligible.map((player) => [player.id, { last10: 0, last12Months: 0 }]));
+  for (const match of played) {
+    const ids = new Set([...match.teamA, ...match.teamB].map((player) => player.id));
+    for (const id of ids) {
+      const total = totals.get(id);
+      if (!total) continue;
+      if (recent.has(match.id)) total.last10 += 1;
+      if (match.playedOn >= cutoff) total.last12Months += 1;
+    }
+  }
+  return eligible
+    .map((player) => ({ player, last10: totals.get(player.id)?.last10 ?? 0, last12Months: totals.get(player.id)?.last12Months ?? 0 }))
+    .sort((left, right) => left.last10 - right.last10 || left.last12Months - right.last12Months || byName(left.player, right.player));
 }
 
 export function lastProfessorId(matches: MatchDetail[]) {
@@ -122,19 +148,21 @@ export function upcomingTuesdays(matches: MatchDetail[], today = new Date(), end
   return dates;
 }
 
-export function buildFutureSlots(order: { id: string }[], lastId: string | null, dates: string[], plans: { playedOn: string; playerId: string }[]) {
-  const saved = new Map(plans.map((plan) => [plan.playedOn, plan.playerId]));
+export type PlannedSlot = { playedOn: string; playerId: string; cancelled?: boolean };
+
+export function buildFutureSlots(order: { id: string }[], lastId: string | null, dates: string[], plans: PlannedSlot[]) {
+  const saved = new Map(plans.map((plan) => [plan.playedOn, plan]));
   let cursor = Math.max(order.findIndex((player) => player.id === lastId), -1);
   return dates.flatMap((playedOn) => {
     const chosen = saved.get(playedOn);
-    if (chosen && order.some((player) => player.id === chosen)) {
-      cursor = order.findIndex((player) => player.id === chosen);
-      return [{ playedOn, playerId: chosen }];
+    if (chosen && order.some((player) => player.id === chosen.playerId)) {
+      cursor = order.findIndex((player) => player.id === chosen.playerId);
+      return [{ playedOn, playerId: chosen.playerId, cancelled: Boolean(chosen.cancelled) }];
     }
     if (!order.length) return [];
     cursor = (cursor + 1) % order.length;
     const player = order[cursor];
-    return player ? [{ playedOn, playerId: player.id }] : [];
+    return player ? [{ playedOn, playerId: player.id, cancelled: false }] : [];
   });
 }
 
@@ -142,7 +170,7 @@ export type CallListOptions = {
   today?: Date;
   order?: string[];
   absentIds?: string[];
-  plans?: { playedOn: string; playerId: string }[];
+  plans?: PlannedSlot[];
 };
 
 export function buildCallList(players: PlayerRef[], matches: MatchDetail[], options: CallListOptions = {}) {
@@ -150,27 +178,45 @@ export function buildCallList(players: PlayerRef[], matches: MatchDetail[], opti
   const active = players.filter((player) => player.active !== false && player.name.trim().toLocaleLowerCase("pt-BR") !== "gol contra" && !absent.has(player.id));
   const mensalistas = active.filter((player) => !isSuplente(player)).sort(byPosition);
   const { professorOn } = latestDates(matches);
-  const date = nextGameDate(matches, options.today ?? new Date());
   const roster = players.filter((player) => player.active !== false && !isSuplente(player));
   const rotation = (options.order ?? []).flatMap((id) => {
     const player = roster.find((item) => item.id === id);
     return player ? [player] : [];
   });
-  const future = buildFutureSlots(rotation, lastProfessorId(matches), upcomingTuesdays(matches, options.today), options.plans ?? []);
-  const planned = rotation.find((player) => player.id === future[0]?.playerId);
+  const today = options.today ?? new Date();
+  const future = buildFutureSlots(rotation, lastProfessorId(matches), upcomingTuesdays(matches, today), options.plans ?? []);
+  const open = future.find((slot) => !slot.cancelled);
+  const planned = rotation.find((player) => player.id === open?.playerId);
   const professor = planned ?? (rotation.length
     ? nextInRotation(rotation, lastProfessorId(matches), absent)
     : nextInRotation([...roster].sort(byQueue(professorOn)), null, absent));
+  const gameDate = open?.playedOn ?? nextGameDate(matches, today);
+  const marks = new Map(gameSequence(active, matches, today).map((row) => [row.player.id, row]));
+  const subs = substituteGroups(active, matches);
+
+  function lines(title: string, people: PlayerRef[]) {
+    if (!people.length) return "";
+    const body = people
+      .map((player, index) => {
+        const row = marks.get(player.id);
+        const mark = row ? ` (${row.last10}/10 · ${row.last12Months})` : "";
+        return `${index + 1}. ${player.name}${mark}`;
+      })
+      .join("\n");
+    return `${title}\n${body}`;
+  }
 
   const blocks = [
-    numbered(mensalistas.filter(isKeeper)),
-    numbered(mensalistas.filter((player) => !isKeeper(player))),
-    numbered(substituteQueue(active, matches)),
+    lines("Goleiros", mensalistas.filter(isKeeper)),
+    lines("Jogadores", mensalistas.filter((player) => !isKeeper(player))),
+    lines("Goleiros suplentes", subs.keepers),
+    lines("Suplentes", subs.field),
   ].filter(Boolean);
   return [
-    `Futibas TERÇA-FEIRA ${formatTinyDate(date)} 18:30 BOMBONERA`,
+    `Futibas TERÇA-FEIRA ${formatTinyDate(gameDate)} 18:30 BOMBONERA`,
     "OBS: Quem não for, retira o nome da lista",
     `OBS2: Professor ${professor?.name ?? "a definir"}`,
+    "Sequência: últimos 10 jogos · últimos 12 meses",
     "",
     blocks.join("\n\n"),
   ]
