@@ -13,21 +13,11 @@ import { ErrorText, MiniButton, Muted, PageTitle, PanelHead, ScoreText, Stack } 
 
 type Turn = ProfessorRoster["order"][number];
 
-function playedGames(matches: MatchDetail[]) {
-  const games = new Map<string, MatchDetail[]>();
-  for (const match of matches) {
-    if (match.scheduled || !match.professor) continue;
-    const bucket = games.get(match.professor.id) ?? [];
-    bucket.push(match);
-    games.set(match.professor.id, bucket);
-  }
-  for (const bucket of games.values()) bucket.sort((left, right) => left.playedOn.localeCompare(right.playedOn));
-  return games;
-}
-
-function resultOf(match: MatchDetail) {
-  if (match.scoreA !== null && match.scoreB !== null) return match.scoreA - match.scoreB;
-  return match.goalDiffA;
+function professorSaldo(match: MatchDetail) {
+  const id = match.professor?.id;
+  if (!id) return null;
+  const player = [...match.teamA, ...match.teamB].find((item) => item.id === id);
+  return player ? player.goalDiff : null;
 }
 
 function scoreOf(match: MatchDetail) {
@@ -55,9 +45,15 @@ function ProfessorsRoster() {
   const current = seasons.find((season) => season.isCurrent) ?? seasons[0];
   const selected = seasons.find((season) => season.code === params.get("temporada")) ?? current;
   const seasonMatches = selected ? matches.filter((match) => match.season.code === selected.code) : [];
-  const games = playedGames(seasonMatches);
-  const rounds = Math.max(1, ...order.map((player) => games.get(player.id)?.length ?? 0));
-  const latestId = [...seasonMatches].filter((match) => !match.scheduled && match.professor).sort((left, right) => right.playedOn.localeCompare(left.playedOn))[0]?.id;
+  const played = seasonMatches
+    .filter((match) => !match.scheduled && match.professor)
+    .sort((left, right) => left.playedOn.localeCompare(right.playedOn) || left.id.localeCompare(right.id));
+  const playedIds = new Set(played.map((match) => match.professor?.id));
+  const rows = [
+    ...played.map((game) => ({ player: order.find((item) => item.id === game.professor?.id) ?? { id: game.professor!.id, name: game.professor!.name, positions: [] as string[] }, game })),
+    ...order.filter((player) => !playedIds.has(player.id)).map((player) => ({ player, game: null as MatchDetail | null })),
+  ];
+  const latestId = [...played].sort((left, right) => right.playedOn.localeCompare(left.playedOn))[0]?.id;
   const next = nextInRotation(order, lastProfessorId(matches), []);
 
   useEffect(() => {
@@ -106,7 +102,7 @@ function ProfessorsRoster() {
         <PageTitle>Professores</PageTitle>
       </PanelHead>
       {ready ? (
-        <Muted>A ordem volta para o primeiro quando acaba. Para mudar a vez, desça a pessoa na lista. Os jogos abaixo são os que já aconteceram.</Muted>
+        <Muted>A ordem volta para o primeiro quando acaba. Para mudar a vez, desça a pessoa na lista. Os jogos abaixo estão por data.</Muted>
       ) : (
         <Muted>Abrindo a ordem...</Muted>
       )}
@@ -121,37 +117,35 @@ function ProfessorsRoster() {
               <span>Professor</span>
               <span>Data</span>
               <span>Semestre</span>
-              <span>Resultado</span>
+              <span>Saldo</span>
               <span>Placar</span>
-              <span />
+              <span>Ações</span>
             </Head>
-            {Array.from({ length: rounds }, (_, round) =>
-              order.map((player, index) => {
-                const game = games.get(player.id)?.[round];
-                const result = game ? resultOf(game) : null;
-                return (
-                  <Line key={`${player.id}-${round}`} $break={index === order.length - 1 && round < rounds - 1}>
-                    <Name>{player.name}</Name>
-                    <DateText $latest={game?.id === latestId}>{game ? formatShortDate(game.playedOn) : ""}</DateText>
-                    <span>{game?.season.code ?? ""}</span>
-                    {result === null ? <span /> : <Result $value={result}>{result}</Result>}
-                    {game ? <ScoreText $tone={winnerTone(game)}>{scoreOf(game)}</ScoreText> : <span />}
-                    <Arrows>
-                      {round === 0 ? (
-                        <>
-                          <MiniButton type="button" aria-label={`Subir ${player.name}`} disabled={busy || index === 0} onClick={() => move(index, -1)}>
-                            ↑
-                          </MiniButton>
-                          <MiniButton type="button" aria-label={`Descer ${player.name}`} disabled={busy || index === order.length - 1} onClick={() => move(index, 1)}>
-                            ↓
-                          </MiniButton>
-                        </>
-                      ) : null}
-                    </Arrows>
-                  </Line>
-                );
-              }),
-            )}
+            {rows.map(({ player, game }) => {
+              const index = order.findIndex((item) => item.id === player.id);
+              const saldo = game ? professorSaldo(game) : null;
+              return (
+                <Line key={game ? game.id : player.id}>
+                  <Name>{player.name}</Name>
+                  <DateText $latest={game?.id === latestId}>{game ? formatShortDate(game.playedOn) : ""}</DateText>
+                  <span>{game?.season.code ?? ""}</span>
+                  {saldo === null ? <span /> : <Result $value={saldo}>{saldo}</Result>}
+                  {game ? <ScoreText $tone={winnerTone(game)}>{scoreOf(game)}</ScoreText> : <span />}
+                  <Arrows>
+                    {index >= 0 ? (
+                      <>
+                        <MiniButton type="button" aria-label={`Subir ${player.name}`} disabled={busy || index === 0} onClick={() => move(index, -1)}>
+                          ↑
+                        </MiniButton>
+                        <MiniButton type="button" aria-label={`Descer ${player.name}`} disabled={busy || index === order.length - 1} onClick={() => move(index, 1)}>
+                          ↓
+                        </MiniButton>
+                      </>
+                    ) : null}
+                  </Arrows>
+                </Line>
+              );
+            })}
           </Grid>
         </Scroll>
       ) : null}
@@ -163,7 +157,7 @@ const Scroll = styled.div`
   overflow-x: auto;
 `;
 
-const columns = "minmax(140px, 1.5fr) 118px 96px 90px 72px auto";
+const columns = "minmax(140px, 1.5fr) 118px 96px 72px 72px 88px";
 
 const Grid = styled.div`
   min-width: 640px;
@@ -178,15 +172,18 @@ const Head = styled.div`
   font-weight: 700;
   padding-bottom: 8px;
   border-bottom: 1px solid ${({ theme }) => theme.ink};
+  > :last-child {
+    justify-self: end;
+  }
 `;
 
-const Line = styled.div<{ $break: boolean }>`
+const Line = styled.div`
   display: grid;
   grid-template-columns: ${columns};
   column-gap: 12px;
   align-items: center;
   min-height: 44px;
-  border-bottom: 1px solid ${({ theme, $break }) => ($break ? theme.ink : theme.line)};
+  border-bottom: 1px solid ${({ theme }) => theme.line};
 `;
 
 const Name = styled.b`
