@@ -1,5 +1,6 @@
 import cors from "@fastify/cors";
 import Fastify from "fastify";
+import { ensureProfessorOrder } from "./lib/professors.js";
 import { prisma } from "./lib/prisma.js";
 import { cleanPositions } from "./lib/roster.js";
 import { seedChampionship } from "./seed.js";
@@ -30,6 +31,7 @@ export async function start() {
     const same = positions.length === player.positions.length && positions.every((item, index) => item === player.positions[index]);
     if (!same) await prisma.player.update({ where: { id: player.id }, data: { positions } });
   }
+  await ensureProfessorOrder();
 
   const port = Number(process.env.PORT || 3333);
   await app.listen({ port, host: "0.0.0.0" });

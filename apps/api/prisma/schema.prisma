@@ -32,10 +32,28 @@ model Player {
   guest       Boolean           @default(false)
   squad       String            @default("mensalista")
   positions   String[]          @default([])
-  appearances MatchAppearance[]
-  events      MatchEvent[]
-  professorOf Match[]           @relation("Professor")
-  createdAt   DateTime          @default(now())
+  appearances   MatchAppearance[]
+  events        MatchEvent[]
+  professorOf   Match[]           @relation("Professor")
+  professorTurn ProfessorTurn?
+  absences      GameAbsence[]
+  createdAt     DateTime          @default(now())
+}
+
+model ProfessorTurn {
+  playerId String @id
+  player   Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  sort     Int
+
+  @@index([sort])
+}
+
+model GameAbsence {
+  playedOn DateTime
+  playerId String
+  player   Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@id([playedOn, playerId])
 }
 
 model Match {

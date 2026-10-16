@@ -4,6 +4,7 @@ import { login, requireUser } from "../lib/auth.js";
 import { seasonFromCode } from "../lib/dates.js";
 import { matchInclude, matchInputSchema, presentMatch, saveMatch } from "../lib/matches.js";
 import { prisma } from "../lib/prisma.js";
+import { professorRoster, saveAbsences, saveProfessorOrder } from "../lib/professors.js";
 import { POSITIONS, SQUADS, cleanPositions } from "../lib/roster.js";
 
 const playerSchema = z.object({
@@ -129,6 +130,37 @@ export async function adminRoutes(app: FastifyInstance) {
       return prisma.season.update({ where: { id: season.id }, data: { isCurrent: true } });
     }
     return season;
+  });
+
+  app.get("/admin/professors", async (request, reply) => {
+    const user = await requireUser(request, reply);
+    if (!user) return;
+    return professorRoster();
+  });
+
+  app.put("/admin/professors", async (request, reply) => {
+    const user = await requireUser(request, reply);
+    if (!user) return;
+    const body = z.object({ playerIds: z.array(z.string().min(1)).max(80) }).safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ message: "Informe a ordem dos mensalistas." });
+    const saved = await saveProfessorOrder(body.data.playerIds);
+    if (!saved.ok) return reply.code(400).send({ message: saved.error });
+    return professorRoster();
+  });
+
+  app.put("/admin/absences", async (request, reply) => {
+    const user = await requireUser(request, reply);
+    if (!user) return;
+    const body = z
+      .object({
+        playedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        playerIds: z.array(z.string().min(1)).max(80),
+      })
+      .safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ message: "Informe a data e quem falta." });
+    const saved = await saveAbsences(body.data.playedOn, body.data.playerIds);
+    if (!saved.ok) return reply.code(400).send({ message: saved.error });
+    return professorRoster();
   });
 
   app.patch<{ Params: { id: string } }>("/admin/seasons/:id", async (request, reply) => {

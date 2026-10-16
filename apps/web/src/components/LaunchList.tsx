@@ -3,8 +3,8 @@
 import { useState } from "react";
 import styled from "styled-components";
 import { clientApi } from "@/lib/client";
-import { buildCallList } from "@/lib/call-list";
-import type { MatchDetail, PlayerRef } from "@/lib/types";
+import { buildCallList, nextGameDate } from "@/lib/call-list";
+import type { MatchDetail, PlayerRef, ProfessorRoster } from "@/lib/types";
 import { Actions, GhostButton, Muted, PrimaryButton } from "@/styles/ui";
 
 export function LaunchList() {
@@ -17,8 +17,14 @@ export function LaunchList() {
     setBusy(true);
     setNote("");
     try {
-      const [players, matches] = await Promise.all([clientApi<PlayerRef[]>("/players"), clientApi<MatchDetail[]>("/matches")]);
-      setText(buildCallList(players, matches));
+      const [players, matches, roster] = await Promise.all([
+        clientApi<PlayerRef[]>("/players"),
+        clientApi<MatchDetail[]>("/matches"),
+        clientApi<ProfessorRoster>("/admin/professors"),
+      ]);
+      const date = nextGameDate(matches);
+      const absentIds = roster.absences.filter((absence) => absence.playedOn === date).map((absence) => absence.playerId);
+      setText(buildCallList(players, matches, { order: roster.order.map((player) => player.id), absentIds }));
       setOpen(true);
     } catch (error) {
       setText("");

@@ -7,6 +7,11 @@ export type Season = {
   isCurrent: boolean;
 };
 
+export type ProfessorRoster = {
+  order: { id: string; name: string; positions: string[] }[];
+  absences: { playedOn: string; playerId: string }[];
+};
+
 export type PlayerRef = {
   id: string;
   name: string;

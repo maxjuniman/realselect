@@ -25,7 +25,7 @@ function localIso(date: Date) {
   return `${date.getFullYear()}-${month}-${day}`;
 }
 
-function nextGameDate(matches: MatchDetail[], today = new Date()) {
+export function nextGameDate(matches: MatchDetail[], today = new Date()) {
   const todayIso = localIso(today);
   const scheduled = matches
     .filter((match) => match.scheduled && match.playedOn >= todayIso)
@@ -68,28 +68,66 @@ function byQueue(dates: Map<string, string>) {
   };
 }
 
-function lines(players: PlayerRef[]) {
-  return players.map((player) => player.name).join("\n");
+export function substituteQueue(players: PlayerRef[], matches: MatchDetail[]) {
+  const active = players.filter((player) => player.active !== false && isSuplente(player) && player.name.trim().toLocaleLowerCase("pt-BR") !== "gol contra");
+  const queue = byQueue(latestDates(matches).playedOn);
+  return [...active.filter(isKeeper).sort(queue), ...active.filter((player) => !isKeeper(player)).sort(queue)];
 }
 
-export function buildCallList(players: PlayerRef[], matches: MatchDetail[], today = new Date()) {
-  const active = players.filter((player) => player.active !== false && player.name.trim().toLocaleLowerCase("pt-BR") !== "gol contra");
-  const mensalistas = active.filter((player) => !isSuplente(player)).sort(byPosition);
-  const suplentes = active.filter(isSuplente);
-  const goleiros = suplentes.filter(isKeeper);
-  const demais = suplentes.filter((player) => !isKeeper(player));
-  const { playedOn, professorOn } = latestDates(matches);
-  const queue = byQueue(playedOn);
-  const date = nextGameDate(matches, today);
-  const professor = [...mensalistas].sort(byQueue(professorOn))[0];
+function numbered(players: PlayerRef[]) {
+  return players.map((player, index) => `${index + 1}. ${player.name}`).join("\n");
+}
 
-  const blocks = [lines(goleiros.sort(queue)), lines(demais.sort(queue))].filter(Boolean);
+export function lastProfessorId(matches: MatchDetail[]) {
+  let best: { id: string; playedOn: string } | null = null;
+  for (const match of matches) {
+    if (match.scheduled || !match.professor) continue;
+    if (!best || match.playedOn > best.playedOn) best = { id: match.professor.id, playedOn: match.playedOn };
+  }
+  return best?.id ?? null;
+}
+
+export function nextInRotation<T extends { id: string }>(order: T[], lastId: string | null, absentIds: Iterable<string>) {
+  if (!order.length) return undefined;
+  const absent = new Set(absentIds);
+  const start = order.findIndex((item) => item.id === lastId);
+  for (let step = 1; step <= order.length; step += 1) {
+    const item = order[(start + step) % order.length];
+    if (!absent.has(item.id)) return item;
+  }
+  return undefined;
+}
+
+export type CallListOptions = {
+  today?: Date;
+  order?: string[];
+  absentIds?: string[];
+};
+
+export function buildCallList(players: PlayerRef[], matches: MatchDetail[], options: CallListOptions = {}) {
+  const absent = new Set(options.absentIds ?? []);
+  const active = players.filter((player) => player.active !== false && player.name.trim().toLocaleLowerCase("pt-BR") !== "gol contra" && !absent.has(player.id));
+  const mensalistas = active.filter((player) => !isSuplente(player)).sort(byPosition);
+  const { professorOn } = latestDates(matches);
+  const date = nextGameDate(matches, options.today ?? new Date());
+  const roster = players.filter((player) => player.active !== false && !isSuplente(player));
+  const rotation = (options.order ?? []).flatMap((id) => {
+    const player = roster.find((item) => item.id === id);
+    return player ? [player] : [];
+  });
+  const professor = rotation.length
+    ? nextInRotation(rotation, lastProfessorId(matches), absent)
+    : nextInRotation([...roster].sort(byQueue(professorOn)), null, absent);
+
+  const blocks = [
+    numbered(mensalistas.filter(isKeeper)),
+    numbered(mensalistas.filter((player) => !isKeeper(player))),
+    numbered(substituteQueue(active, matches)),
+  ].filter(Boolean);
   return [
     `Futibas TERÇA-FEIRA ${formatTinyDate(date)} 18:30 BOMBONERA`,
     "OBS: Quem não for, retira o nome da lista",
     `OBS2: Professor ${professor?.name ?? "a definir"}`,
-    "",
-    lines(mensalistas),
     "",
     blocks.join("\n\n"),
   ]
