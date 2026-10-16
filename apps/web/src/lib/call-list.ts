@@ -195,7 +195,7 @@ export function buildCallList(players: PlayerRef[], matches: MatchDetail[], opti
   const grouped = substituteGroups(active, matches);
   const queue = byQueue(latestDates(matches).playedOn);
   const byRecent = (left: PlayerRef, right: PlayerRef) => {
-    const diff = (marks.get(left.id)?.last10 ?? 0) - (marks.get(right.id)?.last10 ?? 0);
+    const diff = (marks.get(right.id)?.last10 ?? 0) - (marks.get(left.id)?.last10 ?? 0);
     return diff || queue(left, right);
   };
   const subs = {
@@ -227,7 +227,6 @@ export function buildCallList(players: PlayerRef[], matches: MatchDetail[], opti
     `Futibas TERÇA-FEIRA ${formatTinyDate(gameDate)} 18:30 BOMBONERA`,
     "OBS: Quem não for, retira o nome da lista",
     `OBS2: Professor ${professor?.name ?? "a definir"}`,
-    "Sequência: 1/10 até 10/10",
     "",
     blocks.join("\n\n"),
   ]
