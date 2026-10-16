@@ -3,7 +3,7 @@
 import { useState } from "react";
 import styled from "styled-components";
 import { clientApi } from "@/lib/client";
-import { buildCallList, nextGameDate } from "@/lib/call-list";
+import { buildCallList } from "@/lib/call-list";
 import type { MatchDetail, PlayerRef, ProfessorRoster } from "@/lib/types";
 import { Actions, GhostButton, Muted, PrimaryButton } from "@/styles/ui";
 
@@ -22,9 +22,7 @@ export function LaunchList() {
         clientApi<MatchDetail[]>("/matches"),
         clientApi<ProfessorRoster>("/admin/professors"),
       ]);
-      const date = nextGameDate(matches);
-      const absentIds = roster.absences.filter((absence) => absence.playedOn === date).map((absence) => absence.playerId);
-      setText(buildCallList(players, matches, { order: roster.order.map((player) => player.id), absentIds }));
+      setText(buildCallList(players, matches, { order: roster.order.map((player) => player.id) }));
       setOpen(true);
     } catch (error) {
       setText("");
