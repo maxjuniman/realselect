@@ -481,6 +481,200 @@ export const PositionBadge = styled.span`
   display: none;
 `;
 
+export const Banner = styled.section`
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 250px;
+  align-items: end;
+  gap: 8px;
+  margin: 4px 0 36px;
+  padding: 26px 0 0 26px;
+  background: #9335a3;
+  color: #ffffff;
+  border-bottom: 4px solid ${({ theme }) => theme.gold};
+  overflow: hidden;
+  ${mobile} {
+    grid-template-columns: 1fr;
+    margin-bottom: 28px;
+    padding: 16px 14px 16px;
+  }
+`;
+
+export const BannerMain = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  padding-bottom: 22px;
+  ${mobile} {
+    gap: 12px;
+    padding-bottom: 16px;
+  }
+`;
+
+export const BannerKicker = styled.p`
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.78);
+  ${mobile} {
+    min-height: 72px;
+    padding-right: 96px;
+  }
+`;
+
+export const Podium = styled.ol<{ $count: number }>`
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: ${({ $count }) => ($count >= 3 ? "1fr 1.12fr 1fr" : $count === 2 ? "1fr 1fr" : "minmax(0, 280px)")};
+  gap: 10px;
+  align-items: end;
+  ${mobile} {
+    gap: 6px;
+  }
+`;
+
+export const PodiumCard = styled.li<{ $rank: number }>`
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 2px;
+  min-height: ${({ $rank }) => ($rank === 1 ? "164px" : $rank === 2 ? "132px" : "112px")};
+  padding: 14px 14px 12px;
+  background: ${({ $rank }) => ($rank === 1 ? "#ffffff" : "rgba(255, 255, 255, 0.14)")};
+  color: ${({ $rank, theme }) => ($rank === 1 ? theme.ink : "#ffffff")};
+  box-shadow: ${({ $rank }) => ($rank === 1 ? "inset 0 4px 0 #008000" : "inset 0 0 0 1px rgba(255,255,255,0.2)")};
+  a {
+    color: inherit;
+    font-family: ${({ theme }) => theme.display};
+    font-stretch: 87.5%;
+    font-weight: 700;
+    font-size: ${({ $rank }) => ($rank === 1 ? "26px" : "18px")};
+    letter-spacing: -0.03em;
+    line-height: 0.98;
+    overflow-wrap: anywhere;
+  }
+  a:hover {
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
+  }
+  ${mobile} {
+    min-height: ${({ $rank }) => ($rank === 1 ? "128px" : $rank === 2 ? "108px" : "96px")};
+    padding: 10px 8px 8px;
+    a {
+      font-size: ${({ $rank }) => ($rank === 1 ? "18px" : "14px")};
+    }
+  }
+`;
+
+export const PlaceMark = styled.span`
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.7;
+`;
+
+export const PlacePoints = styled.span`
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  b {
+    margin-right: 4px;
+    font-family: ${({ theme }) => theme.display};
+    font-stretch: 87.5%;
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    line-height: 0.9;
+  }
+  ${mobile} {
+    b {
+      font-size: 24px;
+    }
+  }
+`;
+
+export const AwardRow = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  ${mobile} {
+    gap: 6px;
+  }
+`;
+
+export const AwardCard = styled.article`
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 3px 0 0 rgba(255, 255, 255, 0.85);
+  span {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.74);
+  }
+  a {
+    color: #ffffff;
+    font-family: ${({ theme }) => theme.display};
+    font-stretch: 87.5%;
+    font-weight: 700;
+    font-size: 22px;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    overflow-wrap: anywhere;
+  }
+  a:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  em {
+    font-style: normal;
+    font-weight: 700;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.9);
+    white-space: nowrap;
+  }
+  ${mobile} {
+    padding: 10px;
+    span {
+      letter-spacing: 0.06em;
+    }
+    a {
+      font-size: 16px;
+    }
+  }
+`;
+
+export const BannerMascot = styled.div`
+  align-self: end;
+  justify-self: end;
+  img {
+    display: block;
+    width: 250px;
+    height: auto;
+  }
+  ${mobile} {
+    position: absolute;
+    top: 8px;
+    right: 0;
+    img {
+      width: 104px;
+    }
+  }
+`;
+
 export const HeroArt = styled.div`
   display: flex;
   align-items: flex-end;

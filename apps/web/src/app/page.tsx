@@ -1,24 +1,19 @@
+import { SeasonBanner } from "@/components/SeasonBanner";
 import { SeasonSelect } from "@/components/SeasonSelect";
 import { StandingsTable } from "@/components/StandingsTable";
-import { loadSeasons, loadStandings } from "@/lib/api";
-import { Empty, Hero, HeroArt, HeroCopy, PageTitle, Panel, PanelHead, Rules, SectionTitle } from "@/styles/ui";
+import { api, loadSeasons, loadStandings } from "@/lib/api";
+import type { ScorerRow, Season } from "@/lib/types";
+import { Empty, PageTitle, Panel, PanelHead, Rules, SectionTitle } from "@/styles/ui";
 
 export default async function HomePage({ searchParams }: { searchParams: Promise<{ temporada?: string }> }) {
   const params = await searchParams;
   try {
     const [seasons, table] = await Promise.all([loadSeasons(), loadStandings(params.temporada)]);
-    const leader = table.rows[0];
+    const scorers = await api<{ season: Season; rows: ScorerRow[] }>(`/scorers?season=${encodeURIComponent(table.season.code)}`);
 
     return (
       <>
-        <Hero>
-          <HeroCopy>
-            <h1>{leader ? `${leader.player.name} lidera com ${leader.points} pontos` : table.season.name}</h1>
-          </HeroCopy>
-          <HeroArt>
-            <img src="/brand/mascot.png" alt="Mascote do Real Select" />
-          </HeroArt>
-        </Hero>
+        <SeasonBanner seasonName={table.season.name} rows={table.rows} scorers={scorers.rows} />
 
         <Panel>
           <PanelHead>
