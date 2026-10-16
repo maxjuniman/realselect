@@ -192,15 +192,26 @@ export function buildCallList(players: PlayerRef[], matches: MatchDetail[], opti
     : nextInRotation([...roster].sort(byQueue(professorOn)), null, absent));
   const gameDate = open?.playedOn ?? nextGameDate(matches, today);
   const marks = new Map(gameSequence(active, matches, today).map((row) => [row.player.id, row]));
-  const subs = substituteGroups(active, matches);
+  const grouped = substituteGroups(active, matches);
+  const queue = byQueue(latestDates(matches).playedOn);
+  const byRecent = (left: PlayerRef, right: PlayerRef) => {
+    const diff = (marks.get(left.id)?.last10 ?? 0) - (marks.get(right.id)?.last10 ?? 0);
+    return diff || queue(left, right);
+  };
+  const subs = {
+    keepers: [...grouped.keepers].sort(byRecent),
+    field: [...grouped.field].sort(byRecent),
+  };
 
   function lines(title: string, people: PlayerRef[]) {
     if (!people.length) return "";
     const body = people
       .map((player, index) => {
         const row = marks.get(player.id);
-        const mark = row ? ` (${row.last10}/10 · ${row.last12Months})` : "";
-        return `${index + 1}. ${player.name}${mark}`;
+        const position = player.positions?.[0];
+        const place = position ? ` (${position})` : "";
+        const count = row ? ` ${row.last10}/10` : "";
+        return `${index + 1}. ${player.name}${place}${count}`;
       })
       .join("\n");
     return `${title}\n${body}`;
@@ -216,7 +227,7 @@ export function buildCallList(players: PlayerRef[], matches: MatchDetail[], opti
     `Futibas TERÇA-FEIRA ${formatTinyDate(gameDate)} 18:30 BOMBONERA`,
     "OBS: Quem não for, retira o nome da lista",
     `OBS2: Professor ${professor?.name ?? "a definir"}`,
-    "Sequência: últimos 10 jogos · últimos 12 meses",
+    "Sequência: 1/10 até 10/10",
     "",
     blocks.join("\n\n"),
   ]

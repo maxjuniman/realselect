@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { FormEvent, Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import styled from "styled-components";
 import { SeasonSelect } from "@/components/SeasonSelect";
@@ -9,7 +9,7 @@ import { clientApi } from "@/lib/client";
 import { formatShortDate, seasonCodeFromDate } from "@/lib/format";
 import { placar, winnerTone } from "@/lib/score";
 import type { MatchDetail, ProfessorRoster, Season } from "@/lib/types";
-import { ErrorText, MiniButton, Muted, PageTitle, PanelHead, ScoreText, SectionTitle, Select, Stack } from "@/styles/ui";
+import { Actions, ErrorText, Field, GhostButton, MiniButton, Muted, PageTitle, PanelHead, PrimaryButton, ScoreText, SectionTitle, Select, Stack, TextInput } from "@/styles/ui";
 
 type Turn = ProfessorRoster["order"][number];
 
@@ -39,6 +39,8 @@ function ProfessorsRoster() {
   const [matches, setMatches] = useState<MatchDetail[]>([]);
   const [plans, setPlans] = useState<{ playedOn: string; playerId: string; cancelled?: boolean }[]>([]);
   const [seasons, setSeasons] = useState<Season[]>([]);
+  const [editing, setEditing] = useState<Turn | null>(null);
+  const [draftName, setDraftName] = useState("");
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -88,28 +90,33 @@ function ProfessorsRoster() {
       });
   }, []);
 
-  async function moveOrder(index: number, delta: number) {
-    const target = index + delta;
-    if (target < 0 || target >= order.length || busy) return;
-    const previous = order;
-    const nextOrder = [...order];
-    const item = nextOrder[index];
-    if (!item) return;
-    nextOrder.splice(index, 1);
-    nextOrder.splice(target, 0, item);
-    setOrder(nextOrder);
+  function openEdit(player: Turn) {
+    setEditing(player);
+    setDraftName(player.name);
+    setError("");
+  }
+
+  async function saveName(event: FormEvent) {
+    event.preventDefault();
+    if (!editing || busy) return;
+    const name = draftName.trim();
+    if (name.length < 2) return;
     setBusy(true);
     setError("");
     try {
-      const saved = await clientApi<ProfessorRoster>("/admin/professors", {
-        method: "PUT",
-        body: JSON.stringify({ playerIds: nextOrder.map((player) => player.id) }),
-      });
-      setOrder(saved.order);
-      setPlans(saved.plans ?? plans);
+      await clientApi(`/admin/players/${editing.id}`, { method: "PATCH", body: JSON.stringify({ name }) });
+      setOrder((current) => current.map((player) => (player.id === editing.id ? { ...player, name } : player)));
+      setMatches((current) =>
+        current.map((match) => ({
+          ...match,
+          professor: match.professor?.id === editing.id ? { ...match.professor, name } : match.professor,
+          teamA: match.teamA.map((player) => (player.id === editing.id ? { ...player, name } : player)),
+          teamB: match.teamB.map((player) => (player.id === editing.id ? { ...player, name } : player)),
+        })),
+      );
+      setEditing(null);
     } catch (caught) {
-      setOrder(previous);
-      setError(caught instanceof Error ? caught.message : "Não consegui salvar a ordem.");
+      setError(caught instanceof Error ? caught.message : "Não consegui salvar o nome.");
     } finally {
       setBusy(false);
     }
@@ -186,7 +193,7 @@ function ProfessorsRoster() {
         <PageTitle>Professores</PageTitle>
       </PanelHead>
       {ready ? (
-        <Muted>A ordem abaixo é o ciclo original. As terças até 31/12/2026 ficam em seguida: dá para trocar, tirar uma ocorrência ou cancelar o jogo.</Muted>
+        <Muted>A ordem não muda. Nas terças, no máximo se troca o jogo. Se alguém deixar de ir, use Editar para mudar o nome.</Muted>
       ) : (
         <Muted>Abrindo a ordem...</Muted>
       )}
@@ -203,14 +210,9 @@ function ProfessorsRoster() {
                 <Name>
                   {index + 1}. {player.name}
                 </Name>
-                <Arrows>
-                  <MiniButton type="button" aria-label={`Subir ${player.name} na ordem`} disabled={busy || index === 0} onClick={() => moveOrder(index, -1)}>
-                    ↑
-                  </MiniButton>
-                  <MiniButton type="button" aria-label={`Descer ${player.name} na ordem`} disabled={busy || index === order.length - 1} onClick={() => moveOrder(index, 1)}>
-                    ↓
-                  </MiniButton>
-                </Arrows>
+                <MiniButton type="button" aria-label={`Editar ${player.name}`} disabled={busy} onClick={() => openEdit(player)}>
+                  Editar
+                </MiniButton>
               </OrderLine>
             ))}
           </OrderGrid>
@@ -279,6 +281,28 @@ function ProfessorsRoster() {
           </Grid>
         </Scroll>
       ) : null}
+      {editing ? (
+        <Backdrop onMouseDown={() => setEditing(null)}>
+          <Dialog role="dialog" aria-modal="true" aria-labelledby="edit-player-title" onMouseDown={(event) => event.stopPropagation()}>
+            <h2 id="edit-player-title">Editar jogador</h2>
+            <form onSubmit={saveName}>
+              <Field>
+                Nome
+                <TextInput aria-label="Nome do jogador" value={draftName} autoFocus onChange={(event) => setDraftName(event.target.value)} />
+              </Field>
+              {error ? <ErrorText>{error}</ErrorText> : null}
+              <Actions>
+                <GhostButton type="button" onClick={() => setEditing(null)}>
+                  Cancelar
+                </GhostButton>
+                <PrimaryButton type="submit" disabled={busy || draftName.trim().length < 2}>
+                  Salvar
+                </PrimaryButton>
+              </Actions>
+            </form>
+          </Dialog>
+        </Backdrop>
+      ) : null}
     </Stack>
   );
 }
@@ -302,6 +326,39 @@ const OrderLine = styled.div`
   gap: 8px;
   min-height: 40px;
   border-bottom: 1px solid ${({ theme }) => theme.line};
+`;
+
+const Backdrop = styled.div`
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(28, 16, 34, 0.46);
+`;
+
+const Dialog = styled.div`
+  width: min(440px, 100%);
+  background: ${({ theme }) => theme.paper};
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  h2 {
+    margin: 0;
+    font-family: ${({ theme }) => theme.display};
+    font-stretch: 87.5%;
+    font-weight: 700;
+    font-size: 36px;
+    letter-spacing: -0.03em;
+    line-height: 0.95;
+  }
+  form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
 `;
 
 const Grid = styled.div`
