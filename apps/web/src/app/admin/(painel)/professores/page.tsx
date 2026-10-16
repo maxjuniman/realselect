@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import styled from "styled-components";
+import { SeasonSelect } from "@/components/SeasonSelect";
 import { lastProfessorId, nextInRotation } from "@/lib/call-list";
 import { clientApi } from "@/lib/client";
 import { formatShortDate } from "@/lib/format";
 import { placar, winnerTone } from "@/lib/score";
-import type { MatchDetail, ProfessorRoster } from "@/lib/types";
+import type { MatchDetail, ProfessorRoster, Season } from "@/lib/types";
 import { ErrorText, MiniButton, Muted, PageTitle, PanelHead, ScoreText, Stack } from "@/styles/ui";
 
 type Turn = ProfessorRoster["order"][number];
@@ -34,20 +36,34 @@ function scoreOf(match: MatchDetail) {
 }
 
 export default function ProfessorsPage() {
+  return (
+    <Suspense fallback={<Muted>Abrindo a ordem...</Muted>}>
+      <ProfessorsRoster />
+    </Suspense>
+  );
+}
+
+function ProfessorsRoster() {
+  const params = useSearchParams();
   const [order, setOrder] = useState<Turn[]>([]);
   const [matches, setMatches] = useState<MatchDetail[]>([]);
+  const [seasons, setSeasons] = useState<Season[]>([]);
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const games = playedGames(matches);
+  const current = seasons.find((season) => season.isCurrent) ?? seasons[0];
+  const selected = seasons.find((season) => season.code === params.get("temporada")) ?? current;
+  const seasonMatches = selected ? matches.filter((match) => match.season.code === selected.code) : [];
+  const games = playedGames(seasonMatches);
   const rounds = Math.max(1, ...order.map((player) => games.get(player.id)?.length ?? 0));
-  const latestId = [...matches].filter((match) => !match.scheduled && match.professor).sort((left, right) => right.playedOn.localeCompare(left.playedOn))[0]?.id;
+  const latestId = [...seasonMatches].filter((match) => !match.scheduled && match.professor).sort((left, right) => right.playedOn.localeCompare(left.playedOn))[0]?.id;
   const next = nextInRotation(order, lastProfessorId(matches), []);
 
   useEffect(() => {
-    Promise.all([clientApi<MatchDetail[]>("/matches"), clientApi<ProfessorRoster>("/admin/professors")])
-      .then(([loadedMatches, roster]) => {
+    Promise.all([clientApi<Season[]>("/seasons"), clientApi<MatchDetail[]>("/matches"), clientApi<ProfessorRoster>("/admin/professors")])
+      .then(([loadedSeasons, loadedMatches, roster]) => {
+        setSeasons(loadedSeasons);
         setMatches(loadedMatches);
         setOrder(roster.order);
         setReady(true);
@@ -94,6 +110,7 @@ export default function ProfessorsPage() {
       ) : (
         <Muted>Abrindo a ordem...</Muted>
       )}
+      {selected ? <SeasonSelect seasons={seasons} value={selected.code} path="/admin/professores" /> : null}
       {next ? <Muted>Próximo professor: {next.name}.</Muted> : null}
       {error ? <ErrorText>{error}</ErrorText> : null}
       {ready && !order.length && !error ? <Muted>Nenhum mensalista na ordem.</Muted> : null}
