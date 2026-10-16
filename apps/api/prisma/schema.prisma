@@ -37,6 +37,7 @@ model Player {
   professorOf   Match[]           @relation("Professor")
   professorTurn ProfessorTurn?
   absences      GameAbsence[]
+  professorPlans ProfessorPlan[]
   createdAt     DateTime          @default(now())
 }
 
@@ -54,6 +55,12 @@ model GameAbsence {
   player   Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
 
   @@id([playedOn, playerId])
+}
+
+model ProfessorPlan {
+  playedOn DateTime @id
+  playerId String
+  player   Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
 }
 
 model Match {

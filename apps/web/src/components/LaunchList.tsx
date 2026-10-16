@@ -22,7 +22,7 @@ export function LaunchList() {
         clientApi<MatchDetail[]>("/matches"),
         clientApi<ProfessorRoster>("/admin/professors"),
       ]);
-      setText(buildCallList(players, matches, { order: roster.order.map((player) => player.id) }));
+      setText(buildCallList(players, matches, { order: roster.order.map((player) => player.id), plans: roster.plans ?? [] }));
       setOpen(true);
     } catch (error) {
       setText("");

@@ -98,10 +98,51 @@ export function nextInRotation<T extends { id: string }>(order: T[], lastId: str
   return undefined;
 }
 
+export const PROFESSOR_HORIZON = "2026-12-31";
+
+export function upcomingTuesdays(matches: MatchDetail[], today = new Date(), end = PROFESSOR_HORIZON) {
+  const played = matches.filter((match) => !match.scheduled).map((match) => match.playedOn);
+  const last = [...played].sort().at(-1);
+  let start = nextTuesday(today);
+  if (last && last >= start) {
+    const [year, month, day] = last.split("-").map(Number);
+    start = nextTuesday(new Date(year, month - 1, day + 1));
+  }
+  const playedSet = new Set(played);
+  const dates: string[] = [];
+  let cursor = start;
+  while (cursor <= end) {
+    if (!playedSet.has(cursor)) dates.push(cursor);
+    const [year, month, day] = cursor.split("-").map(Number);
+    const next = new Date(year, month - 1, day + 7);
+    const nextMonth = String(next.getMonth() + 1).padStart(2, "0");
+    const nextDay = String(next.getDate()).padStart(2, "0");
+    cursor = `${next.getFullYear()}-${nextMonth}-${nextDay}`;
+  }
+  return dates;
+}
+
+export function buildFutureSlots(order: { id: string }[], lastId: string | null, dates: string[], plans: { playedOn: string; playerId: string }[]) {
+  const saved = new Map(plans.map((plan) => [plan.playedOn, plan.playerId]));
+  let cursor = Math.max(order.findIndex((player) => player.id === lastId), -1);
+  return dates.flatMap((playedOn) => {
+    const chosen = saved.get(playedOn);
+    if (chosen && order.some((player) => player.id === chosen)) {
+      cursor = order.findIndex((player) => player.id === chosen);
+      return [{ playedOn, playerId: chosen }];
+    }
+    if (!order.length) return [];
+    cursor = (cursor + 1) % order.length;
+    const player = order[cursor];
+    return player ? [{ playedOn, playerId: player.id }] : [];
+  });
+}
+
 export type CallListOptions = {
   today?: Date;
   order?: string[];
   absentIds?: string[];
+  plans?: { playedOn: string; playerId: string }[];
 };
 
 export function buildCallList(players: PlayerRef[], matches: MatchDetail[], options: CallListOptions = {}) {
@@ -115,9 +156,11 @@ export function buildCallList(players: PlayerRef[], matches: MatchDetail[], opti
     const player = roster.find((item) => item.id === id);
     return player ? [player] : [];
   });
-  const professor = rotation.length
+  const future = buildFutureSlots(rotation, lastProfessorId(matches), upcomingTuesdays(matches, options.today), options.plans ?? []);
+  const planned = rotation.find((player) => player.id === future[0]?.playerId);
+  const professor = planned ?? (rotation.length
     ? nextInRotation(rotation, lastProfessorId(matches), absent)
-    : nextInRotation([...roster].sort(byQueue(professorOn)), null, absent);
+    : nextInRotation([...roster].sort(byQueue(professorOn)), null, absent));
 
   const blocks = [
     numbered(mensalistas.filter(isKeeper)),

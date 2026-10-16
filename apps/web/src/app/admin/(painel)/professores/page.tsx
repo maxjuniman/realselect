@@ -4,12 +4,12 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import styled from "styled-components";
 import { SeasonSelect } from "@/components/SeasonSelect";
-import { lastProfessorId, nextInRotation } from "@/lib/call-list";
+import { buildFutureSlots, lastProfessorId, nextInRotation, upcomingTuesdays } from "@/lib/call-list";
 import { clientApi } from "@/lib/client";
-import { formatShortDate } from "@/lib/format";
+import { formatShortDate, seasonCodeFromDate } from "@/lib/format";
 import { placar, winnerTone } from "@/lib/score";
 import type { MatchDetail, ProfessorRoster, Season } from "@/lib/types";
-import { ErrorText, MiniButton, Muted, PageTitle, PanelHead, ScoreText, Stack } from "@/styles/ui";
+import { ErrorText, MiniButton, Muted, PageTitle, PanelHead, ScoreText, Select, Stack } from "@/styles/ui";
 
 type Turn = ProfessorRoster["order"][number];
 
@@ -37,6 +37,7 @@ function ProfessorsRoster() {
   const params = useSearchParams();
   const [order, setOrder] = useState<Turn[]>([]);
   const [matches, setMatches] = useState<MatchDetail[]>([]);
+  const [plans, setPlans] = useState<{ playedOn: string; playerId: string }[]>([]);
   const [seasons, setSeasons] = useState<Season[]>([]);
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
@@ -48,13 +49,27 @@ function ProfessorsRoster() {
   const played = seasonMatches
     .filter((match) => !match.scheduled && match.professor)
     .sort((left, right) => left.playedOn.localeCompare(right.playedOn) || left.id.localeCompare(right.id));
-  const playedIds = new Set(played.map((match) => match.professor?.id));
+  const dates = upcomingTuesdays(matches);
+  const slots = buildFutureSlots(order, lastProfessorId(matches), dates, plans);
+  const future = slots
+    .map((slot, index) => ({ ...slot, index, season: seasonCodeFromDate(slot.playedOn) }))
+    .filter((slot) => !selected || slot.season === selected.code);
   const rows = [
-    ...played.map((game) => ({ player: order.find((item) => item.id === game.professor?.id) ?? { id: game.professor!.id, name: game.professor!.name, positions: [] as string[] }, game })),
-    ...order.filter((player) => !playedIds.has(player.id)).map((player) => ({ player, game: null as MatchDetail | null })),
+    ...played.map((game) => ({
+      kind: "played" as const,
+      player: order.find((item) => item.id === game.professor?.id) ?? { id: game.professor!.id, name: game.professor!.name, positions: [] as string[] },
+      game,
+    })),
+    ...future.map((slot) => ({
+      kind: "future" as const,
+      player: order.find((item) => item.id === slot.playerId) ?? { id: slot.playerId, name: "—", positions: [] as string[] },
+      playedOn: slot.playedOn,
+      season: slot.season,
+      index: slot.index,
+    })),
   ];
   const latestId = [...played].sort((left, right) => right.playedOn.localeCompare(left.playedOn))[0]?.id;
-  const next = nextInRotation(order, lastProfessorId(matches), []);
+  const next = order.find((player) => player.id === slots[0]?.playerId) ?? nextInRotation(order, lastProfessorId(matches), []);
 
   useEffect(() => {
     Promise.all([clientApi<Season[]>("/seasons"), clientApi<MatchDetail[]>("/matches"), clientApi<ProfessorRoster>("/admin/professors")])
@@ -62,6 +77,7 @@ function ProfessorsRoster() {
         setSeasons(loadedSeasons);
         setMatches(loadedMatches);
         setOrder(roster.order);
+        setPlans(roster.plans ?? []);
         setReady(true);
       })
       .catch((caught: Error) => {
@@ -70,30 +86,50 @@ function ProfessorsRoster() {
       });
   }, []);
 
-  async function move(index: number, delta: number) {
-    const target = index + delta;
-    if (target < 0 || target >= order.length || busy) return;
-    const item = order[index];
-    if (!item) return;
-    const previous = order;
-    const nextOrder = [...order];
-    nextOrder.splice(index, 1);
-    nextOrder.splice(target, 0, item);
-    setOrder(nextOrder);
+  async function persist(nextSlots: { playedOn: string; playerId: string }[]) {
+    if (busy) return;
     setBusy(true);
     setError("");
     try {
-      const saved = await clientApi<ProfessorRoster>("/admin/professors", {
+      const saved = await clientApi<ProfessorRoster>("/admin/professor-plans", {
         method: "PUT",
-        body: JSON.stringify({ playerIds: nextOrder.map((player) => player.id) }),
+        body: JSON.stringify({ slots: nextSlots }),
       });
+      setPlans(saved.plans ?? nextSlots);
       setOrder(saved.order);
     } catch (caught) {
-      setOrder(previous);
-      setError(caught instanceof Error ? caught.message : "Não consegui salvar a ordem.");
+      setError(caught instanceof Error ? caught.message : "Não consegui salvar os professores.");
     } finally {
       setBusy(false);
     }
+  }
+
+  function swap(index: number, delta: number) {
+    const target = index + delta;
+    const current = slots[index];
+    const other = slots[target];
+    if (!current || !other) return;
+    const nextSlots = slots.map((slot, position) => {
+      if (position === index) return { ...slot, playerId: other.playerId };
+      if (position === target) return { ...slot, playerId: current.playerId };
+      return slot;
+    });
+    void persist(nextSlots);
+  }
+
+  function changeProfessor(index: number, playerId: string) {
+    void persist(slots.map((slot, position) => (position === index ? { ...slot, playerId } : slot)));
+  }
+
+  function removeSlot(index: number) {
+    if (!order.length || !slots[index]) return;
+    const people = slots.map((slot) => slot.playerId);
+    people.splice(index, 1);
+    const after = people.at(-1) ?? slots[index].playerId;
+    const at = order.findIndex((player) => player.id === after);
+    const fill = order[(at + 1) % order.length];
+    if (fill) people.push(fill.id);
+    void persist(dates.map((playedOn, position) => ({ playedOn, playerId: people[position] ?? fill?.id ?? "" })).filter((slot) => slot.playerId));
   }
 
   return (
@@ -102,7 +138,7 @@ function ProfessorsRoster() {
         <PageTitle>Professores</PageTitle>
       </PanelHead>
       {ready ? (
-        <Muted>A ordem volta para o primeiro quando acaba. Para mudar a vez, desça a pessoa na lista. Os jogos abaixo estão por data.</Muted>
+        <Muted>Os jogos já feitos ficam no topo. As terças até 31/12/2026 aparecem em seguida: dá para trocar o professor ou tirar uma ocorrência quando a pessoa for faltar.</Muted>
       ) : (
         <Muted>Abrindo a ordem...</Muted>
       )}
@@ -121,24 +157,38 @@ function ProfessorsRoster() {
               <span>Placar</span>
               <span>Ações</span>
             </Head>
-            {rows.map(({ player, game }) => {
-              const index = order.findIndex((item) => item.id === player.id);
-              const saldo = game ? professorSaldo(game) : null;
+            {rows.map((row) => {
+              const saldo = row.kind === "played" ? professorSaldo(row.game) : null;
+              const date = row.kind === "played" ? row.game.playedOn : row.playedOn;
+              const season = row.kind === "played" ? row.game.season.code : row.season;
               return (
-                <Line key={game ? game.id : player.id}>
-                  <Name>{player.name}</Name>
-                  <DateText $latest={game?.id === latestId}>{game ? formatShortDate(game.playedOn) : ""}</DateText>
-                  <span>{game?.season.code ?? ""}</span>
+                <Line key={row.kind === "played" ? row.game.id : row.playedOn}>
+                  {row.kind === "future" ? (
+                    <Select aria-label={`Professor em ${formatShortDate(row.playedOn)}`} value={row.player.id} disabled={busy} onChange={(event) => changeProfessor(row.index, event.target.value)}>
+                      {order.map((player) => (
+                        <option key={player.id} value={player.id}>
+                          {player.name}
+                        </option>
+                      ))}
+                    </Select>
+                  ) : (
+                    <Name>{row.player.name}</Name>
+                  )}
+                  <DateText $latest={row.kind === "played" && row.game.id === latestId}>{formatShortDate(date)}</DateText>
+                  <span>{season}</span>
                   {saldo === null ? <span /> : <Result $value={saldo}>{saldo}</Result>}
-                  {game ? <ScoreText $tone={winnerTone(game)}>{scoreOf(game)}</ScoreText> : <span />}
+                  {row.kind === "played" ? <ScoreText $tone={winnerTone(row.game)}>{scoreOf(row.game)}</ScoreText> : <span />}
                   <Arrows>
-                    {index >= 0 ? (
+                    {row.kind === "future" ? (
                       <>
-                        <MiniButton type="button" aria-label={`Subir ${player.name}`} disabled={busy || index === 0} onClick={() => move(index, -1)}>
+                        <MiniButton type="button" aria-label={`Subir ${row.player.name} em ${formatShortDate(row.playedOn)}`} disabled={busy || row.index === 0} onClick={() => swap(row.index, -1)}>
                           ↑
                         </MiniButton>
-                        <MiniButton type="button" aria-label={`Descer ${player.name}`} disabled={busy || index === order.length - 1} onClick={() => move(index, 1)}>
+                        <MiniButton type="button" aria-label={`Descer ${row.player.name} em ${formatShortDate(row.playedOn)}`} disabled={busy || row.index === slots.length - 1} onClick={() => swap(row.index, 1)}>
                           ↓
+                        </MiniButton>
+                        <MiniButton type="button" aria-label={`Tirar ${row.player.name} em ${formatShortDate(row.playedOn)}`} disabled={busy} onClick={() => removeSlot(row.index)}>
+                          Tirar
                         </MiniButton>
                       </>
                     ) : null}
@@ -157,10 +207,10 @@ const Scroll = styled.div`
   overflow-x: auto;
 `;
 
-const columns = "minmax(140px, 1.5fr) 118px 96px 72px 72px 88px";
+const columns = "minmax(160px, 1.6fr) 118px 96px 72px 72px 168px";
 
 const Grid = styled.div`
-  min-width: 640px;
+  min-width: 760px;
 `;
 
 const Head = styled.div`

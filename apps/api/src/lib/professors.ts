@@ -83,10 +83,27 @@ export async function professorRoster() {
     include: { player: { select: { id: true, name: true, positions: true } } },
   });
   const absences = await prisma.gameAbsence.findMany({ orderBy: { playedOn: "asc" } });
+  const plans = await prisma.professorPlan.findMany({ orderBy: { playedOn: "asc" } });
   return {
     order: turns.map((turn) => turn.player),
     absences: absences.map((absence) => ({ playedOn: dateToIso(absence.playedOn), playerId: absence.playerId })),
+    plans: plans.map((plan) => ({ playedOn: dateToIso(plan.playedOn), playerId: plan.playerId })),
   };
+}
+
+export async function saveProfessorPlans(slots: { playedOn: string; playerId: string }[]) {
+  const players = await mensalistas();
+  const allowed = new Set(players.map((player) => player.id));
+  if (slots.some((slot) => !allowed.has(slot.playerId))) return { ok: false as const, error: "O professor precisa ser mensalista." };
+  const uniqueDates = new Set(slots.map((slot) => slot.playedOn));
+  if (uniqueDates.size !== slots.length) return { ok: false as const, error: "Cada terça só pode ter um professor." };
+  await prisma.$transaction([
+    prisma.professorPlan.deleteMany(),
+    prisma.professorPlan.createMany({
+      data: slots.map((slot) => ({ playedOn: isoToDate(slot.playedOn), playerId: slot.playerId })),
+    }),
+  ]);
+  return { ok: true as const };
 }
 
 export async function saveProfessorOrder(playerIds: string[]) {

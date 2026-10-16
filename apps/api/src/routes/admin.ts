@@ -4,7 +4,7 @@ import { login, requireUser } from "../lib/auth.js";
 import { seasonFromCode } from "../lib/dates.js";
 import { matchInclude, matchInputSchema, presentMatch, saveMatch } from "../lib/matches.js";
 import { prisma } from "../lib/prisma.js";
-import { professorRoster, saveAbsences, saveProfessorOrder } from "../lib/professors.js";
+import { professorRoster, saveAbsences, saveProfessorOrder, saveProfessorPlans } from "../lib/professors.js";
 import { POSITIONS, SQUADS, cleanPositions } from "../lib/roster.js";
 
 const playerSchema = z.object({
@@ -144,6 +144,22 @@ export async function adminRoutes(app: FastifyInstance) {
     const body = z.object({ playerIds: z.array(z.string().min(1)).max(80) }).safeParse(request.body);
     if (!body.success) return reply.code(400).send({ message: "Informe a ordem dos mensalistas." });
     const saved = await saveProfessorOrder(body.data.playerIds);
+    if (!saved.ok) return reply.code(400).send({ message: saved.error });
+    return professorRoster();
+  });
+
+  app.put("/admin/professor-plans", async (request, reply) => {
+    const user = await requireUser(request, reply);
+    if (!user) return;
+    const body = z
+      .object({
+        slots: z
+          .array(z.object({ playedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), playerId: z.string().min(1) }))
+          .max(60),
+      })
+      .safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ message: "Informe as terças e os professores." });
+    const saved = await saveProfessorPlans(body.data.slots);
     if (!saved.ok) return reply.code(400).send({ message: saved.error });
     return professorRoster();
   });
