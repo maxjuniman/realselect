@@ -484,119 +484,185 @@ export const PositionBadge = styled.span`
 export const Banner = styled.section`
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 250px;
+  grid-template-columns: minmax(0, 1fr) 230px;
   align-items: end;
-  gap: 8px;
+  gap: 18px;
   margin: 4px 0 36px;
-  padding: 26px 0 0 26px;
-  background: #9335a3;
+  padding: 22px 18px 34px 22px;
+  border-radius: 22px;
   color: #ffffff;
-  border-bottom: 4px solid ${({ theme }) => theme.gold};
   overflow: hidden;
+  background:
+    radial-gradient(ellipse at 12% 0%, rgba(176, 78, 214, 0.42), transparent 42%),
+    radial-gradient(ellipse at 88% 110%, rgba(92, 24, 150, 0.55), transparent 46%),
+    linear-gradient(155deg, #5a2188 0%, #3a1464 48%, #240844 100%);
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+    background-size: 42px 42px;
+    mask-image: radial-gradient(ellipse at center, #000 30%, transparent 78%);
+  }
+  &::after {
+    content: "";
+    position: absolute;
+    left: 7%;
+    right: 7%;
+    bottom: 12px;
+    height: 4px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, transparent, #39ff78 14%, #e9ffe8 50%, #39ff78 86%, transparent);
+    box-shadow: 0 0 10px 3px rgba(57, 255, 120, 0.9), 0 0 28px 8px rgba(57, 255, 120, 0.55);
+  }
   ${mobile} {
     grid-template-columns: 1fr;
+    gap: 0;
     margin-bottom: 28px;
-    padding: 16px 14px 16px;
+    padding: 16px 12px 30px;
+    border-radius: 16px;
   }
 `;
 
 export const BannerMain = styled.div`
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
   min-width: 0;
-  padding-bottom: 22px;
   ${mobile} {
-    gap: 12px;
-    padding-bottom: 16px;
+    gap: 10px;
   }
 `;
 
 export const BannerKicker = styled.p`
+  position: relative;
   margin: 0;
   font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.16em;
+  font-weight: 600;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.78);
-  ${mobile} {
-    min-height: 72px;
-    padding-right: 96px;
-  }
+  color: rgba(255, 255, 255, 0.82);
 `;
 
 export const Podium = styled.ol<{ $count: number }>`
+  position: relative;
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 46px 0 0;
   display: grid;
-  grid-template-columns: ${({ $count }) => ($count >= 3 ? "1fr 1.12fr 1fr" : $count === 2 ? "1fr 1fr" : "minmax(0, 280px)")};
-  gap: 10px;
+  grid-template-columns: ${({ $count }) => ($count >= 3 ? "1fr 1.05fr 1fr" : $count === 2 ? "1fr 1fr" : "minmax(0, 280px)")};
+  gap: 12px;
   align-items: end;
   ${mobile} {
-    gap: 6px;
+    gap: 8px;
+    padding-top: 40px;
   }
 `;
 
 export const PodiumCard = styled.li<{ $rank: number }>`
+  position: relative;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 2px;
-  min-height: ${({ $rank }) => ($rank === 1 ? "164px" : $rank === 2 ? "132px" : "112px")};
-  padding: 14px 14px 12px;
-  background: ${({ $rank }) => ($rank === 1 ? "#ffffff" : "rgba(255, 255, 255, 0.14)")};
-  color: ${({ $rank, theme }) => ($rank === 1 ? theme.ink : "#ffffff")};
-  box-shadow: ${({ $rank }) => ($rank === 1 ? "inset 0 4px 0 #008000" : "inset 0 0 0 1px rgba(255,255,255,0.2)")};
+  min-height: ${({ $rank }) => ($rank === 1 ? "132px" : "118px")};
+  padding: 16px 16px 14px;
+  border-radius: 18px;
+  color: #ffffff;
+  background: ${({ $rank }) =>
+    $rank === 1
+      ? "linear-gradient(180deg, rgba(124, 58, 186, 0.95) 0%, rgba(74, 28, 128, 0.92) 100%)"
+      : "linear-gradient(180deg, rgba(72, 28, 122, 0.72) 0%, rgba(36, 12, 72, 0.78) 100%)"};
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: ${({ $rank }) => ($rank === 1 ? "0 -12px 24px rgba(61, 255, 122, 0.28)" : "inset 0 1px 0 rgba(255, 255, 255, 0.12)")};
+  ${({ $rank }) =>
+    $rank === 1
+      ? css`
+          &::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 10px;
+            right: 10px;
+            height: 6px;
+            border-radius: 0 0 8px 8px;
+            background: linear-gradient(90deg, #14e86a, #d8ffe8 50%, #14e86a);
+            box-shadow: 0 0 12px 3px rgba(61, 255, 122, 0.9), 0 0 26px 8px rgba(61, 255, 122, 0.45);
+          }
+        `
+      : ""};
   a {
-    color: inherit;
+    color: #ffffff;
     font-family: ${({ theme }) => theme.display};
     font-stretch: 87.5%;
     font-weight: 700;
-    font-size: ${({ $rank }) => ($rank === 1 ? "26px" : "18px")};
+    font-size: ${({ $rank }) => ($rank === 1 ? "28px" : "22px")};
     letter-spacing: -0.03em;
-    line-height: 0.98;
+    line-height: 1;
     overflow-wrap: anywhere;
   }
   a:hover {
     text-decoration: underline;
-    text-decoration-thickness: 2px;
     text-underline-offset: 3px;
   }
   ${mobile} {
-    min-height: ${({ $rank }) => ($rank === 1 ? "128px" : $rank === 2 ? "108px" : "96px")};
-    padding: 10px 8px 8px;
+    min-height: ${({ $rank }) => ($rank === 1 ? "108px" : "96px")};
+    padding: 12px 10px;
+    border-radius: 14px;
     a {
-      font-size: ${({ $rank }) => ($rank === 1 ? "18px" : "14px")};
+      font-size: ${({ $rank }) => ($rank === 1 ? "20px" : "16px")};
     }
   }
 `;
 
+export const Crown = styled.span`
+  position: absolute;
+  top: -44px;
+  left: 50%;
+  z-index: 1;
+  width: 78px;
+  height: 50px;
+  transform: translateX(-50%);
+  svg {
+    display: block;
+    width: 78px;
+    height: 50px;
+    overflow: visible;
+  }
+`;
+
 export const PlaceMark = styled.span`
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  opacity: 0.7;
+  letter-spacing: 0.01em;
+  color: rgba(255, 255, 255, 0.92);
 `;
 
 export const PlacePoints = styled.span`
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
   margin-top: 8px;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
-  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.92);
   b {
-    margin-right: 4px;
     font-family: ${({ theme }) => theme.display};
     font-stretch: 87.5%;
-    font-size: 32px;
+    font-size: 34px;
     font-weight: 700;
     letter-spacing: -0.04em;
     line-height: 0.9;
+    color: #ffffff;
   }
   ${mobile} {
     b {
-      font-size: 24px;
+      font-size: 26px;
     }
   }
 `;
@@ -613,17 +679,19 @@ export const AwardRow = styled.div`
 export const AwardCard = styled.article`
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
   min-width: 0;
-  padding: 12px 14px;
-  background: rgba(255, 255, 255, 0.12);
-  box-shadow: inset 3px 0 0 rgba(255, 255, 255, 0.85);
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(72, 28, 122, 0.72) 0%, rgba(36, 12, 72, 0.78) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
   span {
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: rgba(255, 255, 255, 0.74);
+    color: rgba(255, 255, 255, 0.78);
   }
   a {
     color: #ffffff;
@@ -658,20 +726,11 @@ export const AwardCard = styled.article`
 `;
 
 export const BannerMascot = styled.div`
-  align-self: end;
-  justify-self: end;
-  img {
-    display: block;
-    width: 250px;
-    height: auto;
-  }
+  position: relative;
+  align-self: stretch;
+  min-height: 220px;
   ${mobile} {
-    position: absolute;
-    top: 8px;
-    right: 0;
-    img {
-      width: 104px;
-    }
+    display: none;
   }
 `;
 

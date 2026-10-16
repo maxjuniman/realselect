@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ScorerRow, StandingRow } from "@/lib/types";
-import { AwardCard, AwardRow, Banner, BannerKicker, BannerMain, BannerMascot, PlaceMark, PlacePoints, Podium, PodiumCard } from "@/styles/ui";
+import { AwardCard, AwardRow, Banner, BannerKicker, BannerMain, BannerMascot, Crown, PlaceMark, PlacePoints, Podium, PodiumCard } from "@/styles/ui";
 
 function countLabel(count: number, one: string, many: string) {
   return `${count} ${count === 1 ? one : many}`;
@@ -19,6 +19,26 @@ export function SeasonBanner({ seasonName, rows, scorers }: { seasonName: string
           <Podium $count={ranked.length}>
             {ranked.map((row) => (
               <PodiumCard key={row.player.id} $rank={row.position}>
+                {row.position === 1 ? (
+                  <Crown>
+                    <svg viewBox="0 0 88 56" aria-hidden="true">
+                      <defs>
+                        <filter id="season-crown-glow" x="-35%" y="-35%" width="170%" height="170%">
+                          <feDropShadow dx="0" dy="0" stdDeviation="1.4" floodColor="#c8ffe0" floodOpacity="1" />
+                        </filter>
+                      </defs>
+                      <g filter="url(#season-crown-glow)" fill="none" stroke="#f7fff9" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M8 42 L20 18 L32 30 L44 6 L56 30 L68 18 L80 42" />
+                        <path d="M14 48 H74" />
+                      </g>
+                      <g filter="url(#season-crown-glow)" fill="#f7fff9">
+                        <circle cx="20" cy="16" r="2.6" />
+                        <circle cx="44" cy="5" r="2.8" />
+                        <circle cx="68" cy="16" r="2.6" />
+                      </g>
+                    </svg>
+                  </Crown>
+                ) : null}
                 <PlaceMark>{row.position}º</PlaceMark>
                 <Link href={`/jogadores/${row.player.id}`}>{row.player.name}</Link>
                 <PlacePoints>
@@ -48,9 +68,7 @@ export function SeasonBanner({ seasonName, rows, scorers }: { seasonName: string
           </AwardRow>
         ) : null}
       </BannerMain>
-      <BannerMascot>
-        <img src="/brand/mascot.png" alt="Mascote do Real Select" />
-      </BannerMascot>
+      <BannerMascot />
     </Banner>
   );
 }
