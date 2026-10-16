@@ -5,15 +5,7 @@ import styled from "styled-components";
 import { gameSequence } from "@/lib/call-list";
 import { clientApi } from "@/lib/client";
 import type { MatchDetail, PlayerRef } from "@/lib/types";
-import { ErrorText, Muted, PageTitle, PanelHead, SectionTitle, Stack } from "@/styles/ui";
-
-function isKeeper(player: PlayerRef) {
-  return player.positions?.[0] === "Goleiro";
-}
-
-function isSuplente(player: PlayerRef) {
-  return player.squad === "suplente" || Boolean(player.guest);
-}
+import { ErrorText, Muted, PageTitle, PanelHead, Stack } from "@/styles/ui";
 
 export default function SequencePage() {
   const [players, setPlayers] = useState<PlayerRef[]>([]);
@@ -34,46 +26,36 @@ export default function SequencePage() {
       });
   }, []);
 
-  const rows = gameSequence(players, matches);
-  const groups = [
-    { title: "Mensalistas", rows: rows.filter((row) => !isSuplente(row.player)) },
-    { title: "Goleiros suplentes", rows: rows.filter((row) => isSuplente(row.player) && isKeeper(row.player)) },
-    { title: "Suplentes", rows: rows.filter((row) => isSuplente(row.player) && !isKeeper(row.player)) },
-  ];
+  const rows = [...gameSequence(players, matches)].sort(
+    (left, right) => right.last10 - left.last10 || right.last12Months - left.last12Months || left.player.name.localeCompare(right.player.name, "pt-BR"),
+  );
 
   return (
     <Stack>
       <PanelHead $flush>
         <PageTitle>Sequência de jogos</PageTitle>
       </PanelHead>
-      <Muted>Quantos jogos cada um fez nos últimos 10 jogos e nos últimos 12 meses. Quem jogou menos aparece primeiro. Esses números também entram na lista da terça.</Muted>
+      <Muted>Quantos jogos cada um fez nos últimos 10 jogos e nos últimos 12 meses. Quem jogou mais aparece primeiro.</Muted>
       {error ? <ErrorText>{error}</ErrorText> : null}
       {!ready ? <Muted>Abrindo a sequência...</Muted> : null}
-      {ready
-        ? groups.map((group) =>
-            group.rows.length ? (
-              <Stack key={group.title}>
-                <SectionTitle>{group.title}</SectionTitle>
-                <Scroll>
-                  <Grid>
-                    <Head>
-                      <span>Jogador</span>
-                      <span>Últimos 10</span>
-                      <span>12 meses</span>
-                    </Head>
-                    {group.rows.map((row) => (
-                      <Line key={row.player.id}>
-                        <b>{row.player.name}</b>
-                        <span>{row.last10}</span>
-                        <span>{row.last12Months}</span>
-                      </Line>
-                    ))}
-                  </Grid>
-                </Scroll>
-              </Stack>
-            ) : null,
-          )
-        : null}
+      {ready && rows.length ? (
+        <Scroll>
+          <Grid>
+            <Head>
+              <span>Jogador</span>
+              <span>Últimos 10</span>
+              <span>12 meses</span>
+            </Head>
+            {rows.map((row) => (
+              <Line key={row.player.id}>
+                <b>{row.player.name}</b>
+                <span>{row.last10}</span>
+                <span>{row.last12Months}</span>
+              </Line>
+            ))}
+          </Grid>
+        </Scroll>
+      ) : null}
     </Stack>
   );
 }

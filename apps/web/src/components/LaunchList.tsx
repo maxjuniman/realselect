@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import styled from "styled-components";
 import { clientApi } from "@/lib/client";
 import { buildCallList } from "@/lib/call-list";
@@ -12,6 +12,7 @@ export function LaunchList() {
   const [busy, setBusy] = useState(false);
   const [text, setText] = useState("");
   const [note, setNote] = useState("");
+  const preview = useRef<HTMLTextAreaElement>(null);
 
   async function openList() {
     setBusy(true);
@@ -33,33 +34,43 @@ export function LaunchList() {
     }
   }
 
-  async function share() {
+  function share() {
     setNote("");
-    try {
-      if (navigator.share) {
-        await navigator.share({ text });
-        setNote("Escolha o grupo do Futibas no WhatsApp.");
-        return;
-      }
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") return;
-    }
-    try {
-      await navigator.clipboard.writeText(text);
-      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
-      setNote("O texto foi copiado. No WhatsApp, escolha o grupo e cole a lista.");
-    } catch {
-      setNote("Copie o texto acima e cole no grupo do WhatsApp.");
-    }
+    const link = document.createElement("a");
+    link.href = `https://wa.me/?text=${encodeURIComponent(text)}`;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setNote("O WhatsApp abriu com a lista. Escolha o grupo.");
   }
 
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(text);
-      setNote("Lista copiada.");
-    } catch {
-      setNote("Selecione o texto e copie manualmente.");
+  function copy() {
+    setNote("");
+    const area = preview.current;
+    if (area) {
+      area.focus();
+      area.select();
     }
+    let copied = false;
+    try {
+      copied = document.execCommand("copy");
+    } catch {
+      copied = false;
+    }
+    if (copied) {
+      setNote("Lista copiada.");
+      return;
+    }
+    if (!navigator.clipboard) {
+      setNote("Selecione o texto e copie manualmente.");
+      return;
+    }
+    void navigator.clipboard.writeText(text).then(
+      () => setNote("Lista copiada."),
+      () => setNote("Selecione o texto e copie manualmente."),
+    );
   }
 
   return (
@@ -71,7 +82,7 @@ export function LaunchList() {
         <Backdrop onMouseDown={() => setOpen(false)}>
           <Dialog role="dialog" aria-modal="true" aria-labelledby="call-list-title" onMouseDown={(event) => event.stopPropagation()}>
             <h2 id="call-list-title">Lista da próxima terça</h2>
-            {text ? <Preview readOnly value={text} aria-label="Texto da lista" /> : null}
+            {text ? <Preview ref={preview} readOnly value={text} aria-label="Texto da lista" /> : null}
             {note ? <Muted>{note}</Muted> : null}
             <Actions>
               <GhostButton type="button" onClick={() => setOpen(false)}>
