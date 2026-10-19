@@ -1,6 +1,6 @@
 import { dateToIso } from "./dates.js";
 import { prisma } from "./prisma.js";
-import { isRankingPlayer, orderPiece, playerScore } from "./results.js";
+import { isRankingPlayer, isStandingPlayer, orderPiece, playerScore } from "./results.js";
 
 export async function getSeason(code?: string | null) {
   if (code) {
@@ -55,7 +55,7 @@ export async function standingsFor(seasonId: string) {
   >();
 
   for (const appearance of appearances) {
-    if (!isRankingPlayer(appearance.player.name)) continue;
+    if (!isStandingPlayer(appearance.player.name)) continue;
     const score = playerScore(appearance.team as "A" | "B", appearance.match.goalDiffA);
     const current = rows.get(appearance.playerId) ?? {
       player: {

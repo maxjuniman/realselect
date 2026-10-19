@@ -18,8 +18,17 @@ export function orderPiece(points: number, goalDiff: number, playedOn: Date, won
   return points + 0.001 + goalDiff * 0.00001 + recency;
 }
 
+function foldedName(name: string) {
+  return name.trim().toLocaleLowerCase("pt-BR").replace(/\s+/g, " ");
+}
+
 export function isRankingPlayer(name: string) {
-  return name.trim().toLocaleLowerCase("pt-BR") !== "gol contra";
+  return foldedName(name) !== "gol contra";
+}
+
+export function isStandingPlayer(name: string) {
+  const folded = foldedName(name);
+  return folded !== "gol contra" && folded !== "goleiro de aluguel";
 }
 
 export function scoreLine(scoreA: number | null, scoreB: number | null, goalDiffA: number) {

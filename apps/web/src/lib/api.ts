@@ -1,4 +1,4 @@
-import type { Attendance, MatchDetail, Season, Standings } from "./types";
+import type { Attendance, MatchDetail, ScorerRow, Season, Standings } from "./types";
 
 const base = process.env.API_PROXY_URL || "http://127.0.0.1:3333";
 
@@ -23,6 +23,11 @@ export async function loadSeasons() {
 export async function loadStandings(season?: string) {
   const query = season ? `?season=${encodeURIComponent(season)}` : "";
   return api<Standings>(`/standings${query}`);
+}
+
+export async function loadScorers(season?: string) {
+  const query = season ? `?season=${encodeURIComponent(season)}` : "";
+  return api<{ season: Season; ownGoals: number; rows: ScorerRow[] }>(`/scorers${query}`);
 }
 
 export async function loadMatches(season?: string) {

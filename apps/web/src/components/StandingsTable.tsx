@@ -5,13 +5,20 @@ import { formatDiff, formatPercent, formatShortDate } from "@/lib/format";
 import { Empty, Guest, Muted, NameLink, RankRow, Search, Table, TableWrap, Td, Th, Toolbar } from "@/styles/ui";
 import type { StandingRow } from "@/lib/types";
 
+function rankedRows(rows: StandingRow[]) {
+  const kept = rows.filter((row) => row.player.name.trim().toLocaleLowerCase("pt-BR").replace(/\s+/g, " ") !== "goleiro de aluguel");
+  if (kept.length === rows.length) return rows;
+  return kept.map((row, index) => ({ ...row, position: index + 1 }));
+}
+
 export function StandingsTable({ rows }: { rows: StandingRow[] }) {
   const [query, setQuery] = useState("");
+  const standing = useMemo(() => rankedRows(rows), [rows]);
   const visible = useMemo(() => {
     const term = query.trim().toLocaleLowerCase("pt-BR");
-    if (!term) return rows;
-    return rows.filter((row) => row.player.name.toLocaleLowerCase("pt-BR").includes(term));
-  }, [query, rows]);
+    if (!term) return standing;
+    return standing.filter((row) => row.player.name.toLocaleLowerCase("pt-BR").includes(term));
+  }, [query, standing]);
 
   return (
     <div>

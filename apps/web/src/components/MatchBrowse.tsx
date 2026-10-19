@@ -35,9 +35,11 @@ export function MatchBrowse({ matches, basePath }: { matches: MatchDetail[]; bas
                 {match.professor ? `Prof. ${match.professor.name}` : admin ? (match.scheduled ? "Antes do jogo" : "Sem professor") : `${match.teamA.length} x ${match.teamB.length}`}
               </Muted>
             </ListLink>
-            <Toggle type="button" aria-expanded={open} onClick={() => setOpenId(open ? null : match.id)}>
-              {open ? "Ocultar detalhes" : "Ver detalhes"}
-            </Toggle>
+            {goals || assists ?
+              <Toggle type="button" aria-expanded={open} onClick={() => setOpenId(open ? null : match.id)}>
+                {open ? "Ocultar detalhes" : "Ver detalhes"}
+              </Toggle>
+            : null}
             {open ? (
               <Detail>
                 {match.scheduled ? (

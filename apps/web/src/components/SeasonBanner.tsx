@@ -2,8 +2,15 @@ import Link from "next/link";
 import type { ScorerRow, StandingRow } from "@/lib/types";
 import { AwardCard, AwardRow, Banner, BannerHead, BannerKicker, BannerMain, BannerMascot, BannerNote, Crown, PlaceMark, PlacePoints, Podium, PodiumCard } from "@/styles/ui";
 
+function withoutRentalKeeper(rows: StandingRow[]) {
+  const kept = rows.filter((row) => row.player.name.trim().toLocaleLowerCase("pt-BR").replace(/\s+/g, " ") !== "goleiro de aluguel");
+  if (kept.length === rows.length) return rows;
+  return kept.map((row, index) => ({ ...row, position: index + 1 }));
+}
+
 export function SeasonBanner({ seasonName, rows, scorers }: { seasonName: string; rows: StandingRow[]; scorers: ScorerRow[] }) {
-  const ranked = rows.length >= 3 ? [rows[1], rows[0], rows[2]].filter((row): row is StandingRow => Boolean(row)) : rows.slice(0, 3);
+  const standing = withoutRentalKeeper(rows);
+  const ranked = standing.length >= 3 ? [standing[1], standing[0], standing[2]].filter((row): row is StandingRow => Boolean(row)) : standing.slice(0, 3);
   const scorer = [...scorers].filter((row) => row.goals > 0).sort((left, right) => right.goals - left.goals || right.assists - left.assists)[0];
   const assist = [...scorers].filter((row) => row.assists > 0).sort((left, right) => right.assists - left.assists || right.goals - left.goals)[0];
 
