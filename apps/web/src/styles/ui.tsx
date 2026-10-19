@@ -394,6 +394,20 @@ export const SideCard = styled(Panel)`
   }
 `;
 
+export const PlayerHero = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 16px;
+`;
+
+export const PlayerPhoto = styled.img`
+  width: 84px;
+  height: 84px;
+  object-fit: cover;
+  border-radius: 12px;
+  background: ${({ theme }) => theme.line};
+`;
+
 export const PlayerLine = styled.div`
   display: flex;
   justify-content: space-between;
@@ -869,40 +883,222 @@ export const HeroArt = styled.div`
 `;
 
 export const LoginWrap = styled.div`
-  min-height: 70vh;
+  position: relative;
   display: grid;
-  grid-template-columns: 180px minmax(0, 420px);
-  gap: 36px;
-  align-items: center;
-  justify-content: start;
-  padding: 12px 0 64px;
-  img {
-    width: 180px;
+  grid-template-columns: minmax(0, 460px);
+  align-content: center;
+  gap: 22px;
+  min-height: 560px;
+  margin: 4px 0 28px;
+  padding: 36px 30% 48px 36px;
+  overflow: visible;
+  border-radius: 24px;
+  color: #ffffff;
+  border: 1px solid rgba(88, 28, 135, 0.5);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.45);
+  background:
+    radial-gradient(circle at 80% 20%, rgba(168, 85, 247, 0.25) 0%, transparent 40%),
+    radial-gradient(circle at 18% 82%, rgba(0, 255, 136, 0.15) 0%, transparent 42%),
+    linear-gradient(135deg, #2d124d 0%, #160829 100%);
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    background-size: 30px 30px;
+  }
+  &::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 6px;
+    background: linear-gradient(90deg, #a855f7, #00ff88, #00f0ff);
+    box-shadow: 0 0 15px #00ff88;
   }
   ${mobile} {
-    grid-template-columns: 1fr;
-    img {
-      width: 120px;
+    min-height: 0;
+    padding: 24px 16px 32px;
+    border-radius: 18px;
+  }
+`;
+
+export const LoginIntro = styled.div`
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  h1 {
+    ${display}
+    margin: 0;
+    font-size: 64px;
+    color: #ffffff;
+    text-shadow: 0 0 18px rgba(168, 85, 247, 0.45);
+  }
+  p {
+    margin: 0;
+    max-width: 36ch;
+    color: rgba(233, 213, 255, 0.86);
+  }
+  ${mobile} {
+    h1 {
+      font-size: 46px;
     }
   }
 `;
 
-export const LoginCard = styled.form`
-  background: transparent;
+export const LoginKicker = styled.p`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #00ff88;
+  text-shadow: 0 0 10px rgba(0, 255, 136, 0.6);
+  &::before {
+    content: "";
+    width: 10px;
+    height: 10px;
+    flex: 0 0 auto;
+    border-radius: 999px;
+    background: #00ff88;
+    box-shadow: 0 0 8px #00ff88;
+    ${bannerPulse}
+  }
+`;
+
+export const LoginMascot = styled.div`
+  position: absolute;
+  z-index: 2;
+  top: 10%;
+  right: 0;
+  width: 24%;
+  height: 80%;
+  pointer-events: none;
+  &::before {
+    content: "";
+    position: absolute;
+    left: 10%;
+    right: 10%;
+    top: 18%;
+    bottom: 8%;
+    border-radius: 999px;
+    background: rgba(147, 51, 234, 0.45);
+    filter: blur(28px);
+  }
+  img {
+    position: absolute;
+    z-index: 1;
+    height: 109.8%;
+    width: auto;
+    max-width: none;
+    top: -7.1%;
+    right: 10%;
+    transform: translateX(39.4%);
+    filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.45));
+  }
+  ${mobile} {
+    top: 8px;
+    width: 92px;
+    height: 120px;
+  }
+`;
+
+export const LoginModes = styled.div`
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+`;
+
+export const LoginMode = styled.button<{ $on?: boolean }>`
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-weight: 700;
+  cursor: pointer;
+  color: ${({ $on }) => ($on ? "#160829" : "#e9d5ff")};
+  background: ${({ $on }) => ($on ? "#00ff88" : "transparent")};
+  border: 1px solid ${({ $on }) => ($on ? "#00ff88" : "rgba(255,255,255,0.18)")};
+  &:focus-visible {
+    outline: 2px solid #00ff88;
+    outline-offset: 3px;
+  }
+`;
+
+export const LoginSwitch = styled.button`
+  width: fit-content;
   border: 0;
-  border-radius: 0;
-  box-shadow: none;
   padding: 0;
+  background: transparent;
+  color: #00ff88;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  &:focus-visible {
+    outline: 2px solid #00ff88;
+    outline-offset: 3px;
+  }
+`;
+
+export const LoginCard = styled.form`
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   gap: 14px;
-  h1 {
-    ${display}
-    font-size: 56px;
-    margin: 0;
+  padding: 22px;
+  border-radius: 16px;
+  color: #ffffff;
+  background: rgba(35, 14, 61, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 0 24px rgba(168, 85, 247, 0.12);
+  backdrop-filter: blur(12px);
+  label {
+    color: #e9d5ff;
   }
-  input {
+  p {
+    margin: 0;
+    color: #e9d5ff;
+  }
+  option {
+    color: #160829;
+    background: #ffffff;
+  }
+  input,
+  select {
     width: 100%;
+    color: #ffffff;
+    background: rgba(22, 8, 41, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 10px;
+  }
+  input:focus-visible,
+  select:focus-visible {
+    outline-color: #00ff88;
+  }
+  ${RevealButton} {
+    color: #d8b4fe;
+  }
+  ${ErrorText} {
+    color: #ffb4c4;
+    border-top-color: #ffb4c4;
+  }
+  ${PrimaryButton} {
+    border-radius: 12px;
+    background: #00ff88;
+    color: #160829;
+    &:hover:not(:disabled) {
+      background: #7dffc3;
+    }
   }
 `;
 

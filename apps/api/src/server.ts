@@ -1,5 +1,8 @@
+import { createReadStream, existsSync } from "node:fs";
+import path from "node:path";
 import cors from "@fastify/cors";
 import Fastify from "fastify";
+import { uploadPath } from "./lib/photos.js";
 import { ensureProfessorOrder } from "./lib/professors.js";
 import { prisma } from "./lib/prisma.js";
 import { cleanPositions } from "./lib/roster.js";
@@ -12,6 +15,14 @@ export async function start() {
   await app.register(cors, { origin: process.env.CORS_ORIGIN === "*" ? true : process.env.CORS_ORIGIN || true });
   await app.register(publicRoutes);
   await app.register(adminRoutes);
+
+  app.get<{ Params: { file: string } }>("/uploads/:file", async (request, reply) => {
+    const full = uploadPath(request.params.file);
+    if (!full || !existsSync(full)) return reply.code(404).send({ message: "Foto não encontrada." });
+    const extension = path.extname(full).toLowerCase();
+    const type = extension === ".png" ? "image/png" : extension === ".webp" ? "image/webp" : "image/jpeg";
+    return reply.type(type).header("Cache-Control", "public, max-age=86400").send(createReadStream(full));
+  });
 
   app.setErrorHandler((error, _request, reply) => {
     app.log.error(error);

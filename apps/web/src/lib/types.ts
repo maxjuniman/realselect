@@ -16,12 +16,19 @@ export type ProfessorRoster = {
 export type PlayerRef = {
   id: string;
   name: string;
+  nickname?: string | null;
+  birthDate?: string | null;
+  photo?: string | null;
   guest: boolean;
   active?: boolean;
   squad?: "mensalista" | "suplente";
   injured?: boolean;
   positions?: string[];
 };
+
+export type Session =
+  | { role: "admin"; id: string; name: string; email: string }
+  | { role: "player"; id: string; name: string };
 
 export type StandingRow = {
   position: number;

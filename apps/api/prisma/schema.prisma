@@ -27,12 +27,17 @@ model Season {
 
 model Player {
   id          String            @id @default(cuid())
-  name        String            @unique
-  active      Boolean           @default(true)
-  guest       Boolean           @default(false)
-  squad       String            @default("mensalista")
-  injured     Boolean           @default(false)
-  positions   String[]          @default([])
+  name         String            @unique
+  nickname     String?
+  birthDate    DateTime?
+  photo        String?
+  passwordHash String?
+  access       String            @default("none")
+  active       Boolean           @default(true)
+  guest        Boolean           @default(false)
+  squad        String            @default("mensalista")
+  injured      Boolean           @default(false)
+  positions    String[]          @default([])
   appearances   MatchAppearance[]
   events        MatchEvent[]
   professorOf   Match[]           @relation("Professor")

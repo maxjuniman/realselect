@@ -1,11 +1,22 @@
 import { notFound } from "next/navigation";
 import { ApiError, api } from "@/lib/api";
 import { formatDiff, formatPercent, formatShortDate, resultLabel } from "@/lib/format";
-import { List, ListLink, Muted, PageBlock, PageTitle, Panel, PanelHead, SectionTitle, Stat, StatGrid, Table, TableWrap, Td, Th } from "@/styles/ui";
+import { ageFrom, photoUrl } from "@/lib/photo";
+import { List, ListLink, Muted, PageBlock, PageTitle, Panel, PanelHead, PlayerHero, PlayerPhoto, SectionTitle, Stat, StatGrid, Table, TableWrap, Td, Th } from "@/styles/ui";
 import type { StandingRow } from "@/lib/types";
 
 type PlayerPayload = {
-  player: { id: string; name: string; guest: boolean; active: boolean; squad?: string; positions?: string[] };
+  player: {
+    id: string;
+    name: string;
+    nickname?: string | null;
+    birthDate?: string | null;
+    photo?: string | null;
+    guest: boolean;
+    active: boolean;
+    squad?: string;
+    positions?: string[];
+  };
   seasons: (StandingRow & { season: { code: string; name: string; year: number; half: number } })[];
   matches: {
     id: string;
@@ -30,10 +41,24 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     throw error;
   }
   const current = data.seasons[0];
+  const age = data.player.birthDate ? ageFrom(data.player.birthDate) : null;
+  const portrait = photoUrl(data.player.photo);
 
   return (
     <PageBlock>
-      <PageTitle>{data.player.name}</PageTitle>
+      <PlayerHero>
+        {portrait ? <PlayerPhoto src={portrait} alt="" /> : null}
+        <div>
+          <PageTitle>{data.player.name}</PageTitle>
+          {data.player.nickname || data.player.birthDate ? (
+            <Muted>
+              {[data.player.nickname, data.player.birthDate ? formatShortDate(data.player.birthDate) : "", age !== null ? `${age} anos` : ""]
+                .filter(Boolean)
+                .join(" · ")}
+            </Muted>
+          ) : null}
+        </div>
+      </PlayerHero>
       {current ? (
         <>
           <Muted>

@@ -17,9 +17,23 @@ export async function publicRoutes(app: FastifyInstance) {
     const players = await prisma.player.findMany({
       where: { name: { not: "Gol contra" } },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, active: true, guest: true, squad: true, injured: true, positions: true },
+      select: {
+        id: true,
+        name: true,
+        nickname: true,
+        birthDate: true,
+        photo: true,
+        active: true,
+        guest: true,
+        squad: true,
+        injured: true,
+        positions: true,
+      },
     });
-    return players;
+    return players.map((player) => ({
+      ...player,
+      birthDate: player.birthDate ? dateToIso(player.birthDate) : null,
+    }));
   });
 
   app.get<{ Querystring: { season?: string } }>("/standings", async (request, reply) => {
@@ -76,6 +90,9 @@ export async function publicRoutes(app: FastifyInstance) {
       player: {
         id: player.id,
         name: player.name,
+        nickname: player.nickname,
+        birthDate: player.birthDate ? dateToIso(player.birthDate) : null,
+        photo: player.photo,
         guest: player.guest,
         active: player.active,
         squad: player.squad,

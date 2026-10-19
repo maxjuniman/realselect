@@ -1,8 +1,9 @@
+import { AdminShortcut } from "@/components/AdminShortcut";
 import { SummaryTabs } from "@/components/SummaryTabs";
 import { loadMatches, loadScorers, loadStandings } from "@/lib/api";
 import { formatShortDate } from "@/lib/format";
 import type { ScorerRow } from "@/lib/types";
-import { ButtonLink, PageTitle, PanelHead, Stack, Stat, StatGrid } from "@/styles/ui";
+import { PageTitle, PanelHead, Stack, Stat, StatGrid } from "@/styles/ui";
 
 export const metadata = { title: "Painel" };
 
@@ -22,7 +23,7 @@ export default async function AdminHome() {
     <Stack>
       <PanelHead $flush>
         <PageTitle>Painel</PageTitle>
-        <ButtonLink href="/admin/jogos">Jogos</ButtonLink>
+        <AdminShortcut />
       </PanelHead>
       <StatGrid>
         <Stat><b>{table.season.name}</b><span>Temporada atual</span></Stat>

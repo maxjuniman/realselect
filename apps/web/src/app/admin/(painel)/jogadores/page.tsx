@@ -2,7 +2,9 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
+import { useSession } from "@/components/Session";
 import { clientApi } from "@/lib/client";
+import { photoUrl, shrinkPhoto } from "@/lib/photo";
 import { GROUPS, POSITIONS, positionRank, type GroupId } from "@/lib/roster";
 import type { PlayerRef } from "@/lib/types";
 import { ErrorText, Field, Muted, PageTitle, PanelHead, PrimaryButton, Select, Stack, TextInput } from "@/styles/ui";
@@ -15,14 +17,33 @@ function groupOf(player: PlayerRef): GroupId {
 type Draft = {
   id?: string;
   name: string;
+  nickname: string;
+  birthDate: string;
+  photo: string | null;
+  photoData: string | null;
+  clearPhoto: boolean;
+  password: string;
   group: GroupId;
   first: string;
   second: string;
 };
 
-const emptyDraft = (): Draft => ({ name: "", group: "mensalista", first: "", second: "" });
+const emptyDraft = (): Draft => ({
+  name: "",
+  nickname: "",
+  birthDate: "",
+  photo: null,
+  photoData: null,
+  clearPhoto: false,
+  password: "",
+  group: "mensalista",
+  first: "",
+  second: "",
+});
 
 export default function PlayersAdminPage() {
+  const session = useSession();
+  const mine = session?.role === "player";
   const [players, setPlayers] = useState<PlayerRef[]>([]);
   const [open, setOpen] = useState<Record<GroupId, boolean>>({
     mensalista: true,
@@ -63,21 +84,34 @@ export default function PlayersAdminPage() {
     event.preventDefault();
     if (!draft) return;
     setError("");
+    if (draft.password.trim() && draft.password.trim().length < 4) {
+      setError("A senha precisa ter pelo menos 4 caracteres.");
+      return;
+    }
     const positions = [draft.first, draft.second].filter(Boolean);
+    const profile = {
+      name: draft.name,
+      nickname: draft.nickname.trim() || null,
+      birthDate: draft.birthDate || null,
+      positions,
+      ...(draft.photoData ? { photo: draft.photoData } : draft.clearPhoto ? { photo: null } : {}),
+      ...(draft.password.trim() ? { password: draft.password.trim() } : {}),
+    };
     try {
-      if (draft.id) {
+      if (mine) {
+        await clientApi("/me", { method: "PATCH", body: JSON.stringify(profile) });
+      } else if (draft.id) {
         await clientApi(`/admin/players/${draft.id}`, {
           method: "PATCH",
-          body: JSON.stringify({ name: draft.name, positions }),
+          body: JSON.stringify(profile),
         });
       } else {
         await clientApi("/admin/players", {
           method: "POST",
           body: JSON.stringify({
-            name: draft.name,
+            ...profile,
             active: draft.group !== "inativo",
             squad: draft.group === "suplente" ? "suplente" : "mensalista",
-            positions,
           }),
         });
       }
@@ -119,19 +153,46 @@ export default function PlayersAdminPage() {
     setDraft({
       id: player.id,
       name: player.name,
+      nickname: player.nickname ?? "",
+      birthDate: player.birthDate ?? "",
+      photo: player.photo ?? null,
+      photoData: null,
+      clearPhoto: false,
+      password: "",
       group: groupOf(player),
       first: player.positions?.[0] ?? "",
       second: player.positions?.[1] ?? "",
     });
   }
 
+  async function pickPhoto(file: File | undefined) {
+    if (!file || !draft) return;
+    if (!file.type.startsWith("image/")) {
+      setError("Envie uma imagem.");
+      return;
+    }
+    try {
+      const photoData = await shrinkPhoto(file);
+      setDraft({ ...draft, photoData, clearPhoto: false });
+      setError("");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Não consegui ler a foto.");
+    }
+  }
+
+  const preview = draft?.photoData || (draft && !draft.clearPhoto && draft.photo ? photoUrl(draft.photo) : "");
+
+  if (!session) return null;
+
   return (
     <Stack>
       <PanelHead $flush>
         <PageTitle>Jogadores</PageTitle>
-        <AddButton type="button" aria-label="Adicionar jogador" onClick={() => { setError(""); setDraft(emptyDraft()); }}>
-          <PlusIcon />
-        </AddButton>
+        {mine ? null : (
+          <AddButton type="button" aria-label="Adicionar jogador" onClick={() => { setError(""); setDraft(emptyDraft()); }}>
+            <PlusIcon />
+          </AddButton>
+        )}
       </PanelHead>
       {error && !draft ? <ErrorText>{error}</ErrorText> : null}
       <Groups>
@@ -150,13 +211,22 @@ export default function PlayersAdminPage() {
                     return (
                       <Row key={player.id}>
                         <Who>
-                          <Name>{player.name}</Name>
-                          <Spot>
-                            {player.injured ? "Machucado" : positions.length ? positions.join(" · ") : "Sem posição"}
-                          </Spot>
+                          {player.photo ? <Face src={photoUrl(player.photo)} alt="" /> : null}
+                          <Identity>
+                            <Name>{player.name}{player.nickname ? ` · ${player.nickname}` : ""}</Name>
+                            <Spot>
+                              {player.injured ? "Machucado" : positions.length ? positions.join(" · ") : "Sem posição"}
+                            </Spot>
+                          </Identity>
                         </Who>
                         <Tools>
-                          {item.id === "mensalista" ? (
+                          {mine ? (
+                            session && player.id === session.id ? (
+                              <IconButton type="button" aria-label="Editar meu cadastro" title="Meu cadastro" onClick={() => edit(player)}>
+                                <PencilIcon />
+                              </IconButton>
+                            ) : null
+                          ) : item.id === "mensalista" ? (
                             <HurtButton
                               type="button"
                               $on={Boolean(player.injured)}
@@ -168,20 +238,24 @@ export default function PlayersAdminPage() {
                               <HurtIcon $on={Boolean(player.injured)} />
                             </HurtButton>
                           ) : null}
-                          <IconButton type="button" aria-label={`Editar ${player.name}`} title="Editar" onClick={() => edit(player)}>
-                            <PencilIcon />
-                          </IconButton>
-                          {GROUPS.filter((option) => option.id !== item.id).map((option) => (
-                            <IconButton
-                              key={option.id}
-                              type="button"
-                              aria-label={`Mover ${player.name} para ${option.label.toLowerCase()}`}
-                              title={option.label}
-                              onClick={() => move(player, option.id)}
-                            >
-                              <GroupIcon group={option.id} />
-                            </IconButton>
-                          ))}
+                          {mine ? null : (
+                            <>
+                              <IconButton type="button" aria-label={`Editar ${player.name}`} title="Editar" onClick={() => edit(player)}>
+                                <PencilIcon />
+                              </IconButton>
+                              {GROUPS.filter((option) => option.id !== item.id).map((option) => (
+                                <IconButton
+                                  key={option.id}
+                                  type="button"
+                                  aria-label={`Mover ${player.name} para ${option.label.toLowerCase()}`}
+                                  title={option.label}
+                                  onClick={() => move(player, option.id)}
+                                >
+                                  <GroupIcon group={option.id} />
+                                </IconButton>
+                              ))}
+                            </>
+                          )}
                         </Tools>
                       </Row>
                     );
@@ -199,7 +273,7 @@ export default function PlayersAdminPage() {
         <Backdrop onMouseDown={() => setDraft(null)}>
           <Dialog role="dialog" aria-modal="true" aria-labelledby="player-dialog-title" onMouseDown={(event) => event.stopPropagation()} onSubmit={save}>
             <DialogHead>
-              <h2 id="player-dialog-title">{draft.id ? "Editar jogador" : "Novo jogador"}</h2>
+              <h2 id="player-dialog-title">{mine ? "Meu cadastro" : draft.id ? "Editar jogador" : "Novo jogador"}</h2>
               <IconButton type="button" aria-label="Fechar" onClick={() => setDraft(null)}>
                 <CloseIcon />
               </IconButton>
@@ -208,7 +282,33 @@ export default function PlayersAdminPage() {
               Nome
               <TextInput value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} required autoFocus />
             </Field>
-            {draft.id ? null : (
+            <Field>
+              Apelido
+              <TextInput value={draft.nickname} onChange={(event) => setDraft({ ...draft, nickname: event.target.value })} />
+            </Field>
+            <Field>
+              Data de nascimento
+              <TextInput type="date" value={draft.birthDate} onChange={(event) => setDraft({ ...draft, birthDate: event.target.value })} />
+            </Field>
+            <Field>
+              Foto
+              <PhotoRow>
+                {preview ? <Face src={preview} alt="" /> : <Muted>Sem foto</Muted>}
+                <PhotoFile type="file" accept="image/*" onChange={(event) => pickPhoto(event.target.files?.[0])} />
+              </PhotoRow>
+              {preview ? (
+                <TextButton type="button" onClick={() => setDraft({ ...draft, photoData: null, clearPhoto: true, photo: null })}>
+                  Tirar foto
+                </TextButton>
+              ) : null}
+            </Field>
+            {mine ? (
+              <Field>
+                Nova senha
+                <TextInput type="password" autoComplete="new-password" value={draft.password} onChange={(event) => setDraft({ ...draft, password: event.target.value })} placeholder="Deixe em branco para manter" />
+              </Field>
+            ) : null}
+            {mine || draft.id ? null : (
               <Field>
                 Grupo
                 <Select value={draft.group} onChange={(event) => setDraft({ ...draft, group: event.target.value as GroupId })}>
@@ -441,9 +541,45 @@ const Row = styled.div`
 
 const Who = styled.div`
   display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+`;
+
+const Identity = styled.div`
+  display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+`;
+
+const Face = styled.img`
+  width: 36px;
+  height: 36px;
+  object-fit: cover;
+  border-radius: 8px;
+  background: ${({ theme }) => theme.line};
+`;
+
+const PhotoRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+`;
+
+const PhotoFile = styled.input`
+  font: inherit;
+`;
+
+const TextButton = styled.button`
+  width: fit-content;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: ${({ theme }) => theme.purpleDeep};
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
 `;
 
 const Name = styled.span`
