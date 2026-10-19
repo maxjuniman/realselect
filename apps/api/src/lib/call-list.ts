@@ -241,6 +241,24 @@ export type CallListOptions = {
   barbecue?: boolean;
 };
 
+export function isFirstTuesday(iso: string) {
+  const [year, month, day] = iso.split("-").map(Number);
+  if (!year || !month || !day || day > 7) return false;
+  return new Date(year, month - 1, day).getDay() === 2;
+}
+
+export function listGameDate(players: PlayerRef[], matches: MatchDetail[], options: CallListOptions = {}) {
+  const roster = players.filter((player) => player.active !== false && !isSuplente(player));
+  const rotation = (options.order ?? []).flatMap((id) => {
+    const player = roster.find((item) => item.id === id);
+    return player ? [player] : [];
+  });
+  const today = options.today ?? new Date();
+  const future = buildFutureSlots(rotation, lastProfessorId(matches), upcomingTuesdays(matches, today), options.plans ?? []);
+  const open = future.find((slot) => !slot.cancelled);
+  return open?.playedOn ?? nextGameDate(matches, today);
+}
+
 export function buildCallList(players: PlayerRef[], matches: MatchDetail[], options: CallListOptions = {}) {
   const absent = new Set(options.absentIds ?? []);
   const active = players.filter((player) => player.active !== false && player.name.trim().toLocaleLowerCase("pt-BR") !== "gol contra" && !absent.has(player.id));
@@ -253,7 +271,6 @@ export function buildCallList(players: PlayerRef[], matches: MatchDetail[], opti
   });
   const today = options.today ?? new Date();
   const future = buildFutureSlots(rotation, lastProfessorId(matches), upcomingTuesdays(matches, today), options.plans ?? []);
-  const open = future.find((slot) => !slot.cancelled);
   const professor = rotation.length
     ? nextProfessor(rotation, future, lastProfessorId(matches))
     : nextInRotation(
@@ -261,7 +278,7 @@ export function buildCallList(players: PlayerRef[], matches: MatchDetail[], opti
         null,
         roster.filter((player) => player.injured).map((player) => player.id),
       );
-  const gameDate = open?.playedOn ?? nextGameDate(matches, today);
+  const gameDate = listGameDate(players, matches, options);
   const marks = new Map(gameSequence(active, matches, today).map((row) => [row.player.id, row]));
   const grouped = substituteGroups(active, matches);
   const queue = byQueue(latestDates(matches).playedOn);
@@ -290,7 +307,7 @@ export function buildCallList(players: PlayerRef[], matches: MatchDetail[], opti
     return `${title}\n${body}`;
   }
 
-  const barbecue = Boolean(options.barbecue);
+  const barbecue = options.barbecue ?? isFirstTuesday(gameDate);
   const blocks = [
     lines("Goleiros", mensalistas.filter(isKeeper), barbecue),
     lines("Jogadores", mensalistas.filter((player) => !isKeeper(player)), barbecue),

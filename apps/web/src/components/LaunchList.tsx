@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import styled from "styled-components";
 import { clientApi } from "@/lib/client";
-import { buildCallList } from "@/lib/call-list";
+import { buildCallList, isFirstTuesday, listGameDate } from "@/lib/call-list";
 import type { MatchDetail, PlayerRef, ProfessorRoster } from "@/lib/types";
 import { Actions, Check, GhostButton, Muted, PrimaryButton } from "@/styles/ui";
 
@@ -38,8 +38,10 @@ export function LaunchList() {
         clientApi<ProfessorRoster>("/admin/professors"),
       ]);
       const next = { players, matches, order: roster.order.map((player) => player.id), plans: roster.plans ?? [] };
+      const meat = isFirstTuesday(listGameDate(players, matches, { order: next.order, plans: next.plans }));
       setSource(next);
-      setText(compose(next, barbecue));
+      setBarbecue(meat);
+      setText(compose(next, meat));
       setOpen(true);
     } catch (error) {
       setText("");
