@@ -16,4 +16,4 @@ WORKDIR /app/apps/api
 ENV NODE_ENV=production
 ENV TZ=America/Sao_Paulo
 EXPOSE 3333
-CMD ["sh", "-c", "npx prisma db push --skip-generate && node dist/write-cron-env.js && /usr/sbin/crond -b -l 2 && node dist/index.js"]
+CMD ["sh", "-c", "npx prisma db push --skip-generate --accept-data-loss && node dist/write-cron-env.js && /usr/sbin/crond -b -l 2 && node dist/index.js"]
