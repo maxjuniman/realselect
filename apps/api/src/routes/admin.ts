@@ -82,34 +82,29 @@ export async function adminRoutes(app: FastifyInstance) {
     return session;
   });
 
-  app.post("/auth/register", { bodyLimit: 2_000_000 }, async (request, reply) => {
-    const body = profileSchema.safeParse(request.body);
-    if (!body.success || !body.data.password) return reply.code(400).send({ message: "Confira nome, data, posição e senha." });
+  app.post("/auth/register", async (request, reply) => {
+    const body = z
+      .object({
+        name: z.string().trim().min(2).max(60),
+        birthDate: birthField,
+        password: z.string().min(4).max(60),
+      })
+      .safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ message: "Confira o nome, a data e a senha." });
     const wanted = body.data.name.trim().toLocaleLowerCase("pt-BR");
-    const players = await prisma.player.findMany({
-      where: { active: true, squad: "mensalista", guest: false, name: { not: "Gol contra" } },
-    });
-    const player = players.find((item) => item.name.trim().toLocaleLowerCase("pt-BR") === wanted);
-    if (!player) return reply.code(404).send({ message: "Não encontrei esse nome entre os mensalistas. Use o nome da lista." });
-    if (player.access === "approved") return reply.code(409).send({ message: "Esse cadastro já foi aprovado. Entre com o nome e a senha." });
-    let photo: string | null | undefined;
-    try {
-      photo = await nextPhoto(player.id, player.photo, body.data.photo);
-    } catch (error) {
-      return reply.code(400).send({ message: error instanceof Error ? error.message : "Foto inválida." });
-    }
-    await prisma.player.update({
-      where: { id: player.id },
-      data: {
-        nickname: body.data.nickname?.trim() || null,
-        birthDate: body.data.birthDate ? isoToDate(body.data.birthDate) : null,
-        photo,
-        positions: body.data.positions?.length ? cleanPositions(body.data.positions) : player.positions,
-        passwordHash: hashPassword(body.data.password),
-        access: "pending",
-      },
-    });
-    return { ok: true, message: "Cadastro enviado. Quando o organizador aprovar, entre com seu nome e a senha." };
+    const accounts = await prisma.playerAccount.findMany();
+    const current = accounts.find((item) => item.name.trim().toLocaleLowerCase("pt-BR") === wanted);
+    if (current?.access === "approved") return reply.code(409).send({ message: "Esse cadastro já foi aprovado. Entre com o nome e a senha." });
+    const data = {
+      name: body.data.name.trim(),
+      birthDate: body.data.birthDate ? isoToDate(body.data.birthDate) : null,
+      passwordHash: hashPassword(body.data.password),
+      access: "pending",
+      playerId: current?.access === "denied" ? null : current?.playerId,
+    };
+    if (current) await prisma.playerAccount.update({ where: { id: current.id }, data });
+    else await prisma.playerAccount.create({ data });
+    return { ok: true, message: "Cadastro enviado. Quando o organizador vincular e aprovar, entre com seu nome e a senha." };
   });
 
   app.post("/auth/player", async (request, reply) => {
@@ -134,7 +129,7 @@ export async function adminRoutes(app: FastifyInstance) {
     const body = profileSchema.safeParse(request.body);
     if (!body.success) return reply.code(400).send({ message: "Confira nome, data e posições." });
     if (await sameName(body.data.name, session.player.id)) return reply.code(409).send({ message: "Já existe um jogador com esse nome." });
-    if (body.data.password && session.player.passwordHash && bcrypt.compareSync(body.data.password, session.player.passwordHash)) {
+    if (body.data.password && bcrypt.compareSync(body.data.password, session.account.passwordHash)) {
       return reply.code(400).send({ message: "Escolha uma senha diferente da atual." });
     }
     let photo: string | null | undefined;
@@ -151,9 +146,11 @@ export async function adminRoutes(app: FastifyInstance) {
         birthDate: body.data.birthDate ? isoToDate(body.data.birthDate) : null,
         photo,
         positions: cleanPositions(body.data.positions ?? session.player.positions),
-        passwordHash: body.data.password ? hashPassword(body.data.password) : undefined,
       },
     });
+    if (body.data.password) {
+      await prisma.playerAccount.update({ where: { id: session.account.id }, data: { passwordHash: hashPassword(body.data.password) } });
+    }
     return presentPlayer(player);
   });
 
@@ -234,25 +231,46 @@ export async function adminRoutes(app: FastifyInstance) {
     const user = await requireUser(request, reply);
     if (!user) return;
     const rank = { pending: 0, approved: 1, denied: 2 };
-    const players = await prisma.player.findMany({
-      where: { access: { in: ["pending", "approved", "denied"] }, name: { not: "Gol contra" } },
-      select: { id: true, name: true, nickname: true, birthDate: true, photo: true, positions: true, access: true },
+    const accounts = await prisma.playerAccount.findMany({
+      include: { player: { select: { id: true, name: true } } },
     });
-    return players
-      .map((player) => ({ ...player, birthDate: player.birthDate ? dateToIso(player.birthDate) : null }))
+    return accounts
+      .map((account) => ({
+        id: account.id,
+        name: account.name,
+        birthDate: account.birthDate ? dateToIso(account.birthDate) : null,
+        access: account.access,
+        player: account.player,
+      }))
       .sort((left, right) => (rank[left.access as keyof typeof rank] ?? 9) - (rank[right.access as keyof typeof rank] ?? 9) || left.name.localeCompare(right.name, "pt-BR"));
   });
 
   app.post("/admin/player-access", async (request, reply) => {
     const user = await requireUser(request, reply);
     if (!user) return;
-    const body = z.object({ playerId: z.string().min(1), access: z.enum(["approved", "denied"]) }).safeParse(request.body);
-    if (!body.success) return reply.code(400).send({ message: "Informe o jogador e a decisão." });
-    const player = await prisma.player.findUnique({ where: { id: body.data.playerId } });
-    if (!player || player.access === "none" || !player.passwordHash) {
-      return reply.code(404).send({ message: "Esse jogador ainda não se cadastrou." });
+    const body = z
+      .object({
+        accountId: z.string().min(1),
+        playerId: z.string().min(1).nullable().optional(),
+        access: z.enum(["approved", "denied"]),
+      })
+      .safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ message: "Informe o cadastro e a decisão." });
+    const account = await prisma.playerAccount.findUnique({ where: { id: body.data.accountId } });
+    if (!account) return reply.code(404).send({ message: "Cadastro não encontrado." });
+    if (body.data.access === "denied") {
+      await prisma.playerAccount.update({ where: { id: account.id }, data: { access: "denied", playerId: null } });
+      return { ok: true };
     }
-    await prisma.player.update({ where: { id: player.id }, data: { access: body.data.access } });
+    if (!body.data.playerId) return reply.code(400).send({ message: "Escolha o jogador para vincular." });
+    const player = await prisma.player.findUnique({ where: { id: body.data.playerId } });
+    if (!player || player.name === "Gol contra") return reply.code(404).send({ message: "Jogador não encontrado." });
+    const taken = await prisma.playerAccount.findUnique({ where: { playerId: player.id } });
+    if (taken && taken.id !== account.id) return reply.code(409).send({ message: "Esse jogador já está vinculado a outro acesso." });
+    await prisma.playerAccount.update({ where: { id: account.id }, data: { access: "approved", playerId: player.id } });
+    if (!player.birthDate && account.birthDate) {
+      await prisma.player.update({ where: { id: player.id }, data: { birthDate: account.birthDate } });
+    }
     return { ok: true };
   });
 

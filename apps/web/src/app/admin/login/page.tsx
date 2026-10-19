@@ -3,9 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { clientApi } from "@/lib/client";
-import { shrinkPhoto } from "@/lib/photo";
-import { POSITIONS } from "@/lib/roster";
-import { ErrorText, Field, LoginCard, LoginIntro, LoginKicker, LoginMascot, LoginSwitch, LoginWrap, Muted, PasswordWrap, PrimaryButton, RevealButton, Select, TextInput } from "@/styles/ui";
+import { ErrorText, Field, LoginCard, LoginIntro, LoginKicker, LoginMascot, LoginSwitch, LoginWrap, Muted, PasswordWrap, PrimaryButton, RevealButton, TextInput } from "@/styles/ui";
 
 function EyeIcon({ open }: { open: boolean }) {
   const slash = open ? <path d="M5 19 19 5" stroke="currentColor" strokeWidth="1.8" /> : null;
@@ -28,11 +26,7 @@ export default function LoginPage() {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [login, setLogin] = useState("");
   const [name, setName] = useState("");
-  const [nickname, setNickname] = useState("");
   const [birthDate, setBirthDate] = useState("");
-  const [first, setFirst] = useState("");
-  const [second, setSecond] = useState("");
-  const [photo, setPhoto] = useState<string | null>(null);
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [sent, setSent] = useState("");
@@ -47,20 +41,6 @@ export default function LoginPage() {
     setMode("login");
     setError("");
     setSent("");
-  }
-
-  async function pickPhoto(file: File | undefined) {
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      setError("Envie uma imagem.");
-      return;
-    }
-    try {
-      setPhoto(await shrinkPhoto(file));
-      setError("");
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Não consegui ler a foto.");
-    }
   }
 
   async function submit(event: FormEvent) {
@@ -78,11 +58,8 @@ export default function LoginPage() {
           method: "POST",
           body: JSON.stringify({
             name,
-            nickname: nickname.trim() || null,
             birthDate: birthDate || null,
-            positions: [first, second].filter(Boolean),
             password: password.trim(),
-            ...(photo ? { photo } : {}),
           }),
         });
         setSent(result.message);
@@ -104,7 +81,7 @@ export default function LoginPage() {
 
   const intro =
     mode === "register"
-      ? "Use o nome que já está na lista. O organizador aprova antes de liberar a entrada."
+      ? "Informe seu nome e uma senha. O organizador vincula esse acesso a um jogador que já existe."
       : "Organizador entra com o e-mail. Jogador entra com o nome, depois que o cadastro for aprovado.";
 
   return (
@@ -130,42 +107,10 @@ export default function LoginPage() {
           </Field>
         )}
         {mode === "register" ? (
-          <>
-            <Field>
-              Apelido
-              <TextInput value={nickname} onChange={(event) => setNickname(event.target.value)} />
-            </Field>
-            <Field>
-              Data de nascimento
-              <TextInput type="date" value={birthDate} onChange={(event) => setBirthDate(event.target.value)} />
-            </Field>
-            <Field>
-              1ª posição
-              <Select value={first} onChange={(event) => { const value = event.target.value; setFirst(value); if (value === second) setSecond(""); }}>
-                <option value="">Sem posição</option>
-                {POSITIONS.map((position) => (
-                  <option key={position} value={position}>
-                    {position}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field>
-              2ª posição
-              <Select value={second} onChange={(event) => setSecond(event.target.value)}>
-                <option value="">Nenhuma</option>
-                {POSITIONS.filter((position) => position !== first).map((position) => (
-                  <option key={position} value={position}>
-                    {position}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field>
-              Foto
-              <TextInput type="file" accept="image/*" onChange={(event) => pickPhoto(event.target.files?.[0])} />
-            </Field>
-          </>
+          <Field>
+            Data de nascimento
+            <TextInput type="date" value={birthDate} onChange={(event) => setBirthDate(event.target.value)} />
+          </Field>
         ) : null}
         <Field>
           Senha

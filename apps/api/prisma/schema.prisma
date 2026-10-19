@@ -31,8 +31,6 @@ model Player {
   nickname     String?
   birthDate    DateTime?
   photo        String?
-  passwordHash String?
-  access       String            @default("none")
   active       Boolean           @default(true)
   guest        Boolean           @default(false)
   squad        String            @default("mensalista")
@@ -44,7 +42,19 @@ model Player {
   professorTurn ProfessorTurn?
   absences      GameAbsence[]
   professorPlans ProfessorPlan[]
-  createdAt     DateTime          @default(now())
+  account        PlayerAccount?
+  createdAt      DateTime          @default(now())
+}
+
+model PlayerAccount {
+  id           String    @id @default(cuid())
+  name         String
+  birthDate    DateTime?
+  passwordHash String
+  access       String    @default("pending")
+  playerId     String?   @unique
+  player       Player?   @relation(fields: [playerId], references: [id], onDelete: SetNull)
+  createdAt    DateTime  @default(now())
 }
 
 model ProfessorTurn {

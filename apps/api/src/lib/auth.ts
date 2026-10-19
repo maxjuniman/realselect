@@ -26,17 +26,17 @@ export async function login(email: string, password: string) {
 
 export async function loginPlayer(name: string, password: string) {
   const wanted = name.trim().toLocaleLowerCase("pt-BR");
-  const players = await prisma.player.findMany({
-    where: { active: true, squad: "mensalista", guest: false },
-    select: { id: true, name: true, passwordHash: true, access: true },
-  });
-  const player = players.find((item) => item.name.trim().toLocaleLowerCase("pt-BR") === wanted && item.name !== "Gol contra");
-  if (!player) return { error: "Nome não encontrado entre os mensalistas." };
-  if (!player.passwordHash || player.access === "none") return { error: "Cadastre-se para pedir acesso." };
-  if (!bcrypt.compareSync(password, player.passwordHash)) return { error: "Nome ou senha incorretos." };
-  if (player.access === "pending") return { error: "Seu cadastro ainda espera a aprovação do organizador." };
-  if (player.access !== "approved") return { error: "O organizador não liberou esse acesso." };
-  const token = jwt.sign({ sub: player.id, role: "player" }, secret(), { expiresIn: "30d" });
+  const accounts = await prisma.playerAccount.findMany({ include: { player: true } });
+  const account = accounts.find((item) => item.name.trim().toLocaleLowerCase("pt-BR") === wanted);
+  if (!account) return { error: "Cadastre-se para pedir acesso." };
+  if (!bcrypt.compareSync(password, account.passwordHash)) return { error: "Nome ou senha incorretos." };
+  if (account.access === "pending") return { error: "Seu cadastro ainda espera a aprovação do organizador." };
+  if (account.access !== "approved" || !account.player) return { error: "O organizador não liberou esse acesso." };
+  const player = account.player;
+  if (!player.active || player.guest || player.squad !== "mensalista" || player.name === "Gol contra") {
+    return { error: "O organizador não liberou esse acesso." };
+  }
+  const token = jwt.sign({ sub: account.id, role: "player" }, secret(), { expiresIn: "30d" });
   return { token, player: { id: player.id, name: player.name } };
 }
 
@@ -77,12 +77,13 @@ export async function requireSession(request: FastifyRequest, reply: FastifyRepl
   try {
     const payload = jwt.verify(header.slice(7), secret()) as { sub: string; role?: string };
     if (payload.role === "player") {
-      const player = await prisma.player.findUnique({ where: { id: payload.sub } });
-      if (!player || player.access !== "approved" || !player.active || player.guest || player.squad !== "mensalista" || player.name === "Gol contra") {
+      const account = await prisma.playerAccount.findUnique({ where: { id: payload.sub }, include: { player: true } });
+      const player = account?.player;
+      if (!account || account.access !== "approved" || !player || !player.active || player.guest || player.squad !== "mensalista" || player.name === "Gol contra") {
         reply.code(401).send({ message: "Sessão inválida." });
         return null;
       }
-      return { role: "player" as const, player };
+      return { role: "player" as const, player, account };
     }
     const user = await prisma.user.findUnique({ where: { id: payload.sub } });
     if (!user) {
