@@ -20,6 +20,7 @@ export function LaunchList() {
   const [text, setText] = useState("");
   const [note, setNote] = useState("");
   const [barbecue, setBarbecue] = useState(false);
+  const [sending, setSending] = useState(false);
   const [source, setSource] = useState<ListSource | null>(null);
   const preview = useRef<HTMLTextAreaElement>(null);
 
@@ -46,6 +47,19 @@ export function LaunchList() {
       setOpen(true);
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function testBot() {
+    setSending(true);
+    setNote("");
+    try {
+      await clientApi("/admin/call-list", { method: "POST", body: JSON.stringify({ text }) });
+      setNote("Lista enviada no Telegram.");
+    } catch (error) {
+      setNote(error instanceof Error ? error.message : "Não consegui enviar no Telegram.");
+    } finally {
+      setSending(false);
     }
   }
 
@@ -118,8 +132,13 @@ export function LaunchList() {
                 Fechar
               </GhostButton>
               {text ? (
-                <GhostButton type="button" onClick={copy}>
+                <GhostButton type="button" onClick={copy} disabled={sending}>
                   Copiar
+                </GhostButton>
+              ) : null}
+              {text ? (
+                <GhostButton type="button" onClick={testBot} disabled={sending}>
+                  {sending ? "Enviando..." : "Testar o bot"}
                 </GhostButton>
               ) : null}
               {text ? (

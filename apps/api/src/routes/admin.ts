@@ -5,6 +5,7 @@ import { seasonFromCode } from "../lib/dates.js";
 import { matchInclude, matchInputSchema, presentMatch, saveMatch } from "../lib/matches.js";
 import { prisma } from "../lib/prisma.js";
 import { professorRoster, saveAbsences, saveProfessorOrder, saveProfessorPlans } from "../lib/professors.js";
+import { sendTelegramText } from "../lib/telegram-lista.js";
 import { POSITIONS, SQUADS, cleanPositions } from "../lib/roster.js";
 
 const playerSchema = z.object({
@@ -141,6 +142,22 @@ export async function adminRoutes(app: FastifyInstance) {
       return prisma.season.update({ where: { id: season.id }, data: { isCurrent: true } });
     }
     return season;
+  });
+
+  app.post("/admin/call-list", async (request, reply) => {
+    const user = await requireUser(request, reply);
+    if (!user) return;
+    const body = z.object({ text: z.string().trim().min(1).max(4096) }).safeParse(request.body);
+    if (!body.success || !body.data.text.startsWith("Futibas TERÇA-FEIRA")) {
+      return reply.code(400).send({ message: "A lista da terça não está pronta." });
+    }
+    try {
+      await sendTelegramText(body.data.text);
+      return { ok: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Não consegui enviar no Telegram.";
+      return reply.code(502).send({ message });
+    }
   });
 
   app.get("/admin/professors", async (request, reply) => {
