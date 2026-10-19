@@ -1,9 +1,8 @@
 import { LaunchList } from "@/components/LaunchList";
+import { MatchBrowse } from "@/components/MatchBrowse";
 import { SeasonSelect } from "@/components/SeasonSelect";
 import { loadMatches, loadSeasons } from "@/lib/api";
-import { formatTinyDate } from "@/lib/format";
-import { placar, winnerTone } from "@/lib/score";
-import { Actions, ButtonLink, Empty, List, ListLink, Muted, PageTitle, PanelHead, ScoreText, Stack } from "@/styles/ui";
+import { Actions, ButtonLink, Empty, PageTitle, PanelHead, Stack } from "@/styles/ui";
 
 export const metadata = { title: "Jogos" };
 
@@ -25,15 +24,7 @@ export default async function AdminMatchesPage({ searchParams }: { searchParams:
         </Actions>
       </PanelHead>
       {selected ? <SeasonSelect seasons={seasons} value={selected.code} path="/admin/jogos" /> : null}
-      <List>
-        {matches.map((match) => (
-          <ListLink key={match.id} href={`/admin/jogos/${match.id}`}>
-            <span>{formatTinyDate(match.playedOn)}</span>
-            <ScoreText $tone={winnerTone(match)}>{placar(match)}</ScoreText>
-            <Muted as="span">{match.professor ? `Prof. ${match.professor.name}` : match.scheduled ? "Antes do jogo" : "Sem professor"}</Muted>
-          </ListLink>
-        ))}
-      </List>
+      <MatchBrowse matches={matches} basePath="/admin/jogos" />
       {!matches.length ? <Empty>Nenhum jogo neste semestre.</Empty> : null}
     </Stack>
   );

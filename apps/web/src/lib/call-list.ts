@@ -171,6 +171,7 @@ export type CallListOptions = {
   order?: string[];
   absentIds?: string[];
   plans?: PlannedSlot[];
+  barbecue?: boolean;
 };
 
 export function buildCallList(players: PlayerRef[], matches: MatchDetail[], options: CallListOptions = {}) {
@@ -203,7 +204,7 @@ export function buildCallList(players: PlayerRef[], matches: MatchDetail[], opti
     field: [...grouped.field].sort(byRecent),
   };
 
-  function lines(title: string, people: PlayerRef[]) {
+  function lines(title: string, people: PlayerRef[], meat = false) {
     if (!people.length) return "";
     const body = people
       .map((player, index) => {
@@ -211,15 +212,17 @@ export function buildCallList(players: PlayerRef[], matches: MatchDetail[], opti
         const position = player.positions?.[0];
         const place = position ? ` (${position})` : "";
         const count = row ? ` ${row.last10}/10` : "";
-        return `${index + 1}. ${player.name}${place}${count}`;
+        const mark = meat ? " 🍖" : "";
+        return `${index + 1}. ${player.name}${mark}${place}${count}`;
       })
       .join("\n");
     return `${title}\n${body}`;
   }
 
+  const barbecue = Boolean(options.barbecue);
   const blocks = [
-    lines("Goleiros", mensalistas.filter(isKeeper)),
-    lines("Jogadores", mensalistas.filter((player) => !isKeeper(player))),
+    lines("Goleiros", mensalistas.filter(isKeeper), barbecue),
+    lines("Jogadores", mensalistas.filter((player) => !isKeeper(player)), barbecue),
     lines("Goleiros suplentes", subs.keepers),
     lines("Suplentes", subs.field),
   ].filter(Boolean);

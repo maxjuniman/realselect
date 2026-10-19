@@ -5,14 +5,27 @@ import styled from "styled-components";
 import { clientApi } from "@/lib/client";
 import { buildCallList } from "@/lib/call-list";
 import type { MatchDetail, PlayerRef, ProfessorRoster } from "@/lib/types";
-import { Actions, GhostButton, Muted, PrimaryButton } from "@/styles/ui";
+import { Actions, Check, GhostButton, Muted, PrimaryButton } from "@/styles/ui";
+
+type ListSource = {
+  players: PlayerRef[];
+  matches: MatchDetail[];
+  order: string[];
+  plans: ProfessorRoster["plans"];
+};
 
 export function LaunchList() {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [text, setText] = useState("");
   const [note, setNote] = useState("");
+  const [barbecue, setBarbecue] = useState(false);
+  const [source, setSource] = useState<ListSource | null>(null);
   const preview = useRef<HTMLTextAreaElement>(null);
+
+  function compose(data: ListSource, meat: boolean) {
+    return buildCallList(data.players, data.matches, { order: data.order, plans: data.plans ?? [], barbecue: meat });
+  }
 
   async function openList() {
     setBusy(true);
@@ -23,7 +36,9 @@ export function LaunchList() {
         clientApi<MatchDetail[]>("/matches"),
         clientApi<ProfessorRoster>("/admin/professors"),
       ]);
-      setText(buildCallList(players, matches, { order: roster.order.map((player) => player.id), plans: roster.plans ?? [] }));
+      const next = { players, matches, order: roster.order.map((player) => player.id), plans: roster.plans ?? [] };
+      setSource(next);
+      setText(compose(next, barbecue));
       setOpen(true);
     } catch (error) {
       setText("");
@@ -82,6 +97,20 @@ export function LaunchList() {
         <Backdrop onMouseDown={() => setOpen(false)}>
           <Dialog role="dialog" aria-modal="true" aria-labelledby="call-list-title" onMouseDown={(event) => event.stopPropagation()}>
             <h2 id="call-list-title">Lista da próxima terça</h2>
+            {text ? (
+              <Check>
+                <input
+                  type="checkbox"
+                  checked={barbecue}
+                  onChange={(event) => {
+                    const marked = event.target.checked;
+                    setBarbecue(marked);
+                    if (source) setText(compose(source, marked));
+                  }}
+                />
+                Dia de churrasco
+              </Check>
+            ) : null}
             {text ? <Preview ref={preview} readOnly value={text} aria-label="Texto da lista" /> : null}
             {note ? <Muted>{note}</Muted> : null}
             <Actions>
