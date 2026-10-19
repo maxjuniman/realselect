@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { clientApi } from "@/lib/client";
 import { shrinkPhoto } from "@/lib/photo";
 import { POSITIONS } from "@/lib/roster";
-import { ErrorText, Field, LoginCard, LoginIntro, LoginKicker, LoginMascot, LoginMode, LoginModes, LoginSwitch, LoginWrap, Muted, PasswordWrap, PrimaryButton, RevealButton, Select, TextInput } from "@/styles/ui";
+import { ErrorText, Field, LoginCard, LoginIntro, LoginKicker, LoginMascot, LoginSwitch, LoginWrap, Muted, PasswordWrap, PrimaryButton, RevealButton, Select, TextInput } from "@/styles/ui";
 
 function EyeIcon({ open }: { open: boolean }) {
   const slash = open ? <path d="M5 19 19 5" stroke="currentColor" strokeWidth="1.8" /> : null;
@@ -25,8 +25,8 @@ function EyeIcon({ open }: { open: boolean }) {
 
 export default function LoginPage() {
   const router = useRouter();
-  const [mode, setMode] = useState<"admin" | "player" | "register">("admin");
-  const [email, setEmail] = useState("");
+  const [mode, setMode] = useState<"login" | "register">("login");
+  const [login, setLogin] = useState("");
   const [name, setName] = useState("");
   const [nickname, setNickname] = useState("");
   const [birthDate, setBirthDate] = useState("");
@@ -43,8 +43,8 @@ export default function LoginPage() {
     if (localStorage.getItem("rs_token")) router.replace("/admin");
   }, [router]);
 
-  function choose(next: "admin" | "player") {
-    setMode(next);
+  function showLogin() {
+    setMode("login");
     setError("");
     setSent("");
   }
@@ -89,9 +89,9 @@ export default function LoginPage() {
         setPassword("");
         return;
       }
-      const session = await clientApi<{ token: string }>(mode === "player" ? "/auth/player" : "/auth/login", {
+      const session = await clientApi<{ token: string }>("/auth/login", {
         method: "POST",
-        body: JSON.stringify(mode === "player" ? { name, password } : { email, password }),
+        body: JSON.stringify({ login, password }),
       });
       localStorage.setItem("rs_token", session.token);
       router.replace("/admin");
@@ -105,9 +105,7 @@ export default function LoginPage() {
   const intro =
     mode === "register"
       ? "Use o nome que já está na lista. O organizador aprova antes de liberar a entrada."
-      : mode === "player"
-        ? "Mensalista entra com o nome do elenco, depois que o cadastro for aprovado."
-        : "Quem lança a terça entra aqui. A classificação fica aberta para o grupo.";
+      : "Organizador entra com o e-mail. Jogador entra com o nome, depois que o cadastro for aprovado.";
 
   return (
     <LoginWrap>
@@ -116,27 +114,19 @@ export default function LoginPage() {
         <h1>{mode === "register" ? "Cadastro" : "Entrar"}</h1>
         <p>{intro}</p>
       </LoginIntro>
-      <LoginModes>
-        <LoginMode type="button" $on={mode === "admin"} aria-pressed={mode === "admin"} onClick={() => choose("admin")}>
-          Organizador
-        </LoginMode>
-        <LoginMode type="button" $on={mode !== "admin"} aria-pressed={mode !== "admin"} onClick={() => choose("player")}>
-          Jogador
-        </LoginMode>
-      </LoginModes>
       <LoginCard onSubmit={submit}>
         {sent ? <Muted>{sent}</Muted> : null}
         {sent ? null : (
           <>
-        {mode === "admin" ? (
-          <Field>
-            E-mail
-            <TextInput value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="username" />
-          </Field>
-        ) : (
+        {mode === "register" ? (
           <Field>
             Nome
             <TextInput value={name} onChange={(event) => setName(event.target.value)} autoComplete="username" required />
+          </Field>
+        ) : (
+          <Field>
+            E-mail ou nome
+            <TextInput value={login} onChange={(event) => setLogin(event.target.value)} autoComplete="username" required />
           </Field>
         )}
         {mode === "register" ? (
@@ -202,16 +192,15 @@ export default function LoginPage() {
             <PrimaryButton disabled={loading}>{loading ? "Enviando..." : mode === "register" ? "Pedir acesso" : "Entrar"}</PrimaryButton>
           </>
         )}
-        {mode === "player" ? (
+        {mode === "login" ? (
           <LoginSwitch type="button" onClick={() => { setMode("register"); setError(""); setSent(""); }}>
             Quero me cadastrar
           </LoginSwitch>
-        ) : null}
-        {mode === "register" ? (
-          <LoginSwitch type="button" onClick={() => choose("player")}>
+        ) : (
+          <LoginSwitch type="button" onClick={showLogin}>
             Já tenho cadastro
           </LoginSwitch>
-        ) : null}
+        )}
       </LoginCard>
       <LoginMascot>
         <img src="/brand/mascote2.png" alt="Mascote do Real Select" />

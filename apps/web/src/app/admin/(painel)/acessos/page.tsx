@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import styled from "styled-components";
 import { clientApi } from "@/lib/client";
 import { formatShortDate } from "@/lib/format";
 import { photoUrl } from "@/lib/photo";
-import { ErrorText, Muted, PageTitle, Stack } from "@/styles/ui";
+import { ErrorText, Field, Muted, PageTitle, PrimaryButton, SectionTitle, Stack, TextInput } from "@/styles/ui";
 
 type AccessRow = {
   id: string;
@@ -17,16 +17,26 @@ type AccessRow = {
   access: "pending" | "approved" | "denied";
 };
 
+type Organizer = { id: string; name: string; email: string };
+
 const labels = { pending: "Esperando", approved: "Liberado", denied: "Recusado" };
 
 export default function AccessPage() {
   const [rows, setRows] = useState<AccessRow[]>([]);
+  const [organizers, setOrganizers] = useState<Organizer[]>([]);
+  const [orgName, setOrgName] = useState("");
+  const [orgEmail, setOrgEmail] = useState("");
+  const [orgPassword, setOrgPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
 
   async function load() {
-    const data = await clientApi<AccessRow[]>("/admin/player-access");
+    const [data, users] = await Promise.all([
+      clientApi<AccessRow[]>("/admin/player-access"),
+      clientApi<Organizer[]>("/admin/organizers"),
+    ]);
     setRows(data);
+    setOrganizers(users);
   }
 
   useEffect(() => {
@@ -41,6 +51,26 @@ export default function AccessPage() {
       await load();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Não foi possível salvar a decisão.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function createOrganizer(event: FormEvent) {
+    event.preventDefault();
+    setBusy("organizer");
+    setError("");
+    try {
+      await clientApi("/admin/organizers", {
+        method: "POST",
+        body: JSON.stringify({ name: orgName, email: orgEmail, password: orgPassword }),
+      });
+      setOrgName("");
+      setOrgEmail("");
+      setOrgPassword("");
+      await load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Não foi possível criar o organizador.");
     } finally {
       setBusy("");
     }
@@ -82,6 +112,32 @@ export default function AccessPage() {
       ) : (
         <Muted>Nenhum cadastro por enquanto.</Muted>
       )}
+
+      <SectionTitle>Organizadores</SectionTitle>
+      <Muted>Quem organiza entra com o e-mail na mesma tela de login.</Muted>
+      <OrgList>
+        {organizers.map((organizer) => (
+          <OrgRow key={organizer.id}>
+            <strong>{organizer.name}</strong>
+            <Status>{organizer.email}</Status>
+          </OrgRow>
+        ))}
+      </OrgList>
+      <OrgForm onSubmit={createOrganizer}>
+        <Field>
+          Nome
+          <TextInput value={orgName} onChange={(event) => setOrgName(event.target.value)} required />
+        </Field>
+        <Field>
+          E-mail
+          <TextInput type="email" value={orgEmail} onChange={(event) => setOrgEmail(event.target.value)} required />
+        </Field>
+        <Field>
+          Senha
+          <TextInput type="password" autoComplete="new-password" value={orgPassword} onChange={(event) => setOrgPassword(event.target.value)} required minLength={4} />
+        </Field>
+        <PrimaryButton disabled={busy === "organizer"}>{busy === "organizer" ? "Criando..." : "Criar organizador"}</PrimaryButton>
+      </OrgForm>
     </Stack>
   );
 }
@@ -123,6 +179,25 @@ const Status = styled.span`
 const Actions = styled.div`
   display: flex;
   gap: 14px;
+`;
+
+const OrgList = styled.div`
+  display: flex;
+  flex-direction: column;
+`;
+
+const OrgRow = styled.div`
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid ${({ theme }) => theme.line};
+`;
+
+const OrgForm = styled.form`
+  display: grid;
+  gap: 12px;
+  max-width: 420px;
 `;
 
 const TextButton = styled.button`

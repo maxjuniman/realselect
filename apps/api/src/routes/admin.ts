@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
-import { hashPassword, login, loginPlayer, requireSession, requireUser } from "../lib/auth.js";
+import { createUser, hashPassword, login, loginPlayer, requireSession, requireUser } from "../lib/auth.js";
 import { dateToIso, isoToDate, seasonFromCode } from "../lib/dates.js";
 import { matchInclude, matchInputSchema, presentMatch, saveMatch } from "../lib/matches.js";
 import { removePhoto, savePhoto } from "../lib/photos.js";
@@ -63,10 +63,22 @@ async function sameName(name: string, ignoreId?: string) {
 
 export async function adminRoutes(app: FastifyInstance) {
   app.post("/auth/login", async (request, reply) => {
-    const body = z.object({ email: z.string().email(), password: z.string().min(4) }).safeParse(request.body);
-    if (!body.success) return reply.code(400).send({ message: "Informe e-mail e senha." });
-    const session = await login(body.data.email, body.data.password);
-    if (!session) return reply.code(401).send({ message: "E-mail ou senha incorretos." });
+    const body = z
+      .object({
+        login: z.string().trim().min(2).max(80).optional(),
+        email: z.string().trim().optional(),
+        password: z.string().min(4),
+      })
+      .safeParse(request.body);
+    const identity = (body.success ? body.data.login || body.data.email || "" : "").trim();
+    if (!body.success || !identity) return reply.code(400).send({ message: "Informe o e-mail ou o nome, e a senha." });
+    if (identity.includes("@")) {
+      const session = await login(identity, body.data.password);
+      if (!session) return reply.code(401).send({ message: "E-mail ou senha incorretos." });
+      return session;
+    }
+    const session = await loginPlayer(identity, body.data.password);
+    if ("error" in session) return reply.code(401).send({ message: session.error });
     return session;
   });
 
@@ -242,6 +254,30 @@ export async function adminRoutes(app: FastifyInstance) {
     }
     await prisma.player.update({ where: { id: player.id }, data: { access: body.data.access } });
     return { ok: true };
+  });
+
+  app.get("/admin/organizers", async (request, reply) => {
+    const user = await requireUser(request, reply);
+    if (!user) return;
+    return prisma.user.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, email: true } });
+  });
+
+  app.post("/admin/organizers", async (request, reply) => {
+    const user = await requireUser(request, reply);
+    if (!user) return;
+    const body = z
+      .object({
+        name: z.string().trim().min(2).max(60),
+        email: z.string().trim().email(),
+        password: z.string().min(4).max(60),
+      })
+      .safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ message: "Confira nome, e-mail e senha." });
+    const email = body.data.email.toLowerCase();
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) return reply.code(409).send({ message: "Já existe um organizador com esse e-mail." });
+    const created = await createUser(body.data.name, email, body.data.password);
+    return { id: created.id, name: created.name, email: created.email };
   });
 
   app.post("/admin/matches", async (request, reply) => {
