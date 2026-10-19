@@ -80,7 +80,7 @@ export async function professorRoster() {
   await ensureProfessorOrder();
   const turns = await prisma.professorTurn.findMany({
     orderBy: { sort: "asc" },
-    include: { player: { select: { id: true, name: true, positions: true } } },
+    include: { player: { select: { id: true, name: true, positions: true, injured: true } } },
   });
   const absences = await prisma.gameAbsence.findMany({ orderBy: { playedOn: "asc" } });
   const plans = await prisma.professorPlan.findMany({ orderBy: { playedOn: "asc" } });

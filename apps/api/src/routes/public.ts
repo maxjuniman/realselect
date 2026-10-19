@@ -17,7 +17,7 @@ export async function publicRoutes(app: FastifyInstance) {
     const players = await prisma.player.findMany({
       where: { name: { not: "Gol contra" } },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, active: true, guest: true, squad: true, positions: true },
+      select: { id: true, name: true, active: true, guest: true, squad: true, injured: true, positions: true },
     });
     return players;
   });

@@ -8,7 +8,7 @@ export type Season = {
 };
 
 export type ProfessorRoster = {
-  order: { id: string; name: string; positions: string[] }[];
+  order: { id: string; name: string; positions: string[]; injured?: boolean }[];
   absences: { playedOn: string; playerId: string }[];
   plans?: { playedOn: string; playerId: string; cancelled?: boolean }[];
 };
@@ -19,6 +19,7 @@ export type PlayerRef = {
   guest: boolean;
   active?: boolean;
   squad?: "mensalista" | "suplente";
+  injured?: boolean;
   positions?: string[];
 };
 

@@ -12,6 +12,7 @@ const playerSchema = z.object({
   active: z.boolean().optional(),
   guest: z.boolean().optional(),
   squad: z.enum(SQUADS).optional(),
+  injured: z.boolean().optional(),
   positions: z.array(z.enum(POSITIONS)).max(2).optional(),
 });
 
@@ -63,6 +64,15 @@ export async function adminRoutes(app: FastifyInstance) {
     if (body.data.name && (await sameName(body.data.name, request.params.id))) {
       return reply.code(409).send({ message: "Já existe um jogador com esse nome." });
     }
+    const current = await prisma.player.findUnique({ where: { id: request.params.id } });
+    if (!current) return reply.code(404).send({ message: "Jogador não encontrado." });
+    const squad = body.data.squad ?? current.squad;
+    const active = body.data.active ?? current.active;
+    const mensalista = active && squad === "mensalista" && !current.guest && (body.data.guest ?? current.guest) !== true;
+    const injured = mensalista ? (body.data.injured ?? current.injured) : false;
+    if (body.data.injured === true && !mensalista) {
+      return reply.code(400).send({ message: "Só mensalista pode ficar machucado." });
+    }
     try {
       return await prisma.player.update({
         where: { id: request.params.id },
@@ -71,6 +81,7 @@ export async function adminRoutes(app: FastifyInstance) {
           active: body.data.active,
           squad: body.data.squad,
           guest: body.data.squad ? body.data.squad === "suplente" : body.data.guest,
+          injured,
           positions: body.data.positions ? cleanPositions(body.data.positions) : undefined,
         },
       });

@@ -93,11 +93,24 @@ export default function PlayersAdminPage() {
     try {
       await clientApi(`/admin/players/${player.id}`, {
         method: "PATCH",
-        body: JSON.stringify(next === "inativo" ? { active: false } : { active: true, squad: next }),
+        body: JSON.stringify(next === "inativo" ? { active: false, injured: false } : { active: true, squad: next, injured: next === "mensalista" ? Boolean(player.injured) : false }),
       });
       await load();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Não foi possível mover o jogador.");
+    }
+  }
+
+  async function hurt(player: PlayerRef) {
+    setError("");
+    try {
+      await clientApi(`/admin/players/${player.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ injured: !player.injured }),
+      });
+      await load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Não foi possível marcar o jogador.");
     }
   }
 
@@ -138,9 +151,23 @@ export default function PlayersAdminPage() {
                       <Row key={player.id}>
                         <Who>
                           <Name>{player.name}</Name>
-                          <Spot>{positions.length ? positions.join(" · ") : "Sem posição"}</Spot>
+                          <Spot>
+                            {player.injured ? "Machucado" : positions.length ? positions.join(" · ") : "Sem posição"}
+                          </Spot>
                         </Who>
                         <Tools>
+                          {item.id === "mensalista" ? (
+                            <HurtButton
+                              type="button"
+                              $on={Boolean(player.injured)}
+                              aria-pressed={Boolean(player.injured)}
+                              aria-label={player.injured ? `Tirar machucado de ${player.name}` : `Marcar ${player.name} como machucado`}
+                              title={player.injured ? "Machucado" : "Marcar machucado"}
+                              onClick={() => hurt(player)}
+                            >
+                              <HurtIcon $on={Boolean(player.injured)} />
+                            </HurtButton>
+                          ) : null}
                           <IconButton type="button" aria-label={`Editar ${player.name}`} title="Editar" onClick={() => edit(player)}>
                             <PencilIcon />
                           </IconButton>
@@ -244,6 +271,15 @@ function CloseIcon() {
   );
 }
 
+function HurtIcon({ $on }: { $on: boolean }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M8 8h8v8H8z" fill={$on ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8" />
+      <path d="M12 4v16M4 12h16" fill="none" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
 function PencilIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
@@ -303,6 +339,25 @@ const AddButton = styled.button`
   &:focus-visible {
     outline: 2px solid ${({ theme }) => theme.purpleDeep};
     outline-offset: 3px;
+  }
+`;
+
+const HurtButton = styled.button<{ $on: boolean }>`
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: ${({ $on, theme }) => ($on ? theme.loss : theme.ink)};
+  cursor: pointer;
+  &:hover {
+    color: ${({ theme }) => theme.loss};
+  }
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.purpleDeep};
+    outline-offset: 2px;
   }
 `;
 

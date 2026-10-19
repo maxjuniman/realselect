@@ -4,7 +4,7 @@ import { FormEvent, Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import styled from "styled-components";
 import { SeasonSelect } from "@/components/SeasonSelect";
-import { buildFutureSlots, lastProfessorId, nextInRotation, upcomingTuesdays } from "@/lib/call-list";
+import { buildFutureSlots, lastProfessorId, nextProfessor, upcomingTuesdays } from "@/lib/call-list";
 import { clientApi } from "@/lib/client";
 import { formatShortDate, seasonCodeFromDate } from "@/lib/format";
 import { placar, winnerTone } from "@/lib/score";
@@ -73,7 +73,9 @@ function ProfessorsRoster() {
   ];
   const latestId = [...played].sort((left, right) => right.playedOn.localeCompare(left.playedOn))[0]?.id;
   const upcoming = slots.find((slot) => !slot.cancelled);
-  const next = order.find((player) => player.id === upcoming?.playerId) ?? nextInRotation(order, lastProfessorId(matches), []);
+  const assigned = order.find((player) => player.id === upcoming?.playerId);
+  const next = nextProfessor(order, upcoming?.playerId, lastProfessorId(matches));
+  const skipped = assigned?.injured && next?.id !== assigned.id ? assigned : undefined;
 
   useEffect(() => {
     Promise.all([clientApi<Season[]>("/seasons"), clientApi<MatchDetail[]>("/matches"), clientApi<ProfessorRoster>("/admin/professors")])
@@ -198,7 +200,13 @@ function ProfessorsRoster() {
         <Muted>Abrindo a ordem...</Muted>
       )}
       {selected ? <SeasonSelect seasons={seasons} value={selected.code} path="/admin/professores" /> : null}
-      {next ? <Muted>Próximo professor: {next.name}.</Muted> : null}
+      {next ? (
+        <Muted>
+          Próximo professor: {next.name}.{skipped ? ` ${skipped.name} está machucado e pulou a vez.` : ""}
+        </Muted>
+      ) : skipped ? (
+        <Muted>Próximo professor: a definir. {skipped.name} está machucado.</Muted>
+      ) : null}
       {error ? <ErrorText>{error}</ErrorText> : null}
       {ready && !order.length && !error ? <Muted>Nenhum mensalista na ordem.</Muted> : null}
       {order.length ? (
@@ -209,6 +217,7 @@ function ProfessorsRoster() {
               <OrderLine key={player.id}>
                 <Name>
                   {index + 1}. {player.name}
+                  {player.injured ? " (machucado)" : ""}
                 </Name>
                 <MiniButton type="button" aria-label={`Editar ${player.name}`} disabled={busy} onClick={() => openEdit(player)}>
                   Editar
@@ -243,6 +252,7 @@ function ProfessorsRoster() {
                       {order.map((player) => (
                         <option key={player.id} value={player.id}>
                           {player.name}
+                          {player.injured ? " (machucado)" : ""}
                         </option>
                       ))}
                     </Select>

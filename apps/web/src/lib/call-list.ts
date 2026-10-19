@@ -113,6 +113,13 @@ export function lastProfessorId(matches: MatchDetail[]) {
   return best?.id ?? null;
 }
 
+export function nextProfessor<T extends { id: string; injured?: boolean }>(order: T[], assignedId: string | null | undefined, fallbackFromId: string | null) {
+  const blocked = order.filter((player) => player.injured).map((player) => player.id);
+  const assigned = assignedId ? order.find((player) => player.id === assignedId) : undefined;
+  if (assigned && !assigned.injured) return assigned;
+  return nextInRotation(order, assigned?.id ?? fallbackFromId, blocked);
+}
+
 export function nextInRotation<T extends { id: string }>(order: T[], lastId: string | null, absentIds: Iterable<string>) {
   if (!order.length) return undefined;
   const absent = new Set(absentIds);
@@ -187,10 +194,13 @@ export function buildCallList(players: PlayerRef[], matches: MatchDetail[], opti
   const today = options.today ?? new Date();
   const future = buildFutureSlots(rotation, lastProfessorId(matches), upcomingTuesdays(matches, today), options.plans ?? []);
   const open = future.find((slot) => !slot.cancelled);
-  const planned = rotation.find((player) => player.id === open?.playerId);
-  const professor = planned ?? (rotation.length
-    ? nextInRotation(rotation, lastProfessorId(matches), absent)
-    : nextInRotation([...roster].sort(byQueue(professorOn)), null, absent));
+  const professor = rotation.length
+    ? nextProfessor(rotation, open?.playerId, lastProfessorId(matches))
+    : nextInRotation(
+        [...roster].sort(byQueue(professorOn)),
+        null,
+        roster.filter((player) => player.injured).map((player) => player.id),
+      );
   const gameDate = open?.playedOn ?? nextGameDate(matches, today);
   const marks = new Map(gameSequence(active, matches, today).map((row) => [row.player.id, row]));
   const grouped = substituteGroups(active, matches);
@@ -208,6 +218,7 @@ export function buildCallList(players: PlayerRef[], matches: MatchDetail[], opti
     if (!people.length) return "";
     const body = people
       .map((player, index) => {
+        if (player.injured) return `${index + 1}. `;
         const row = marks.get(player.id);
         const position = player.positions?.[0];
         const place = position ? ` (${position})` : "";
