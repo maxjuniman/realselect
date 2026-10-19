@@ -4,7 +4,7 @@ import { FormEvent, Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import styled from "styled-components";
 import { SeasonSelect } from "@/components/SeasonSelect";
-import { buildFutureSlots, lastProfessorId, nextProfessor, upcomingTuesdays } from "@/lib/call-list";
+import { buildFutureSlots, lastProfessorId, nextProfessor, skippedProfessors, upcomingTuesdays } from "@/lib/call-list";
 import { clientApi } from "@/lib/client";
 import { formatShortDate, seasonCodeFromDate } from "@/lib/format";
 import { placar, winnerTone } from "@/lib/score";
@@ -25,6 +25,13 @@ function scoreOf(match: MatchDetail) {
   return placar(match);
 }
 
+function skipSentence(people: { name: string }[]) {
+  if (!people.length) return "";
+  const names = people.map((player) => player.name);
+  const label = names.length === 1 ? names[0] : names.length === 2 ? `${names[0]} e ${names[1]}` : `${names.slice(0, -1).join(", ")} e ${names.at(-1)}`;
+  return names.length === 1 ? ` ${label} está machucado e pulou a vez.` : ` ${label} estão machucados e pularam a vez.`;
+}
+
 export default function ProfessorsPage() {
   return (
     <Suspense fallback={<Muted>Abrindo a ordem...</Muted>}>
@@ -39,6 +46,7 @@ function ProfessorsRoster() {
   const [matches, setMatches] = useState<MatchDetail[]>([]);
   const [plans, setPlans] = useState<{ playedOn: string; playerId: string; cancelled?: boolean }[]>([]);
   const [seasons, setSeasons] = useState<Season[]>([]);
+  const [orderOpen, setOrderOpen] = useState(false);
   const [editing, setEditing] = useState<Turn | null>(null);
   const [draftName, setDraftName] = useState("");
   const [error, setError] = useState("");
@@ -72,10 +80,8 @@ function ProfessorsRoster() {
     })),
   ];
   const latestId = [...played].sort((left, right) => right.playedOn.localeCompare(left.playedOn))[0]?.id;
-  const upcoming = slots.find((slot) => !slot.cancelled);
-  const assigned = order.find((player) => player.id === upcoming?.playerId);
-  const next = nextProfessor(order, upcoming?.playerId, lastProfessorId(matches));
-  const skipped = assigned?.injured && next?.id !== assigned.id ? assigned : undefined;
+  const next = nextProfessor(order, slots, lastProfessorId(matches));
+  const skipped = skippedProfessors(order, slots);
 
   useEffect(() => {
     Promise.all([clientApi<Season[]>("/seasons"), clientApi<MatchDetail[]>("/matches"), clientApi<ProfessorRoster>("/admin/professors")])
@@ -159,26 +165,26 @@ function ProfessorsRoster() {
     void persist(slots.map((slot, position) => (position === index ? { ...slot, playerId } : slot)));
   }
 
-  function removeSlot(index: number) {
-    const current = slots[index];
-    if (!order.length || !current || current.cancelled) return;
-    const openPeople = slots.filter((slot) => !slot.cancelled).map((slot) => slot.playerId);
-    const openAt = slots.filter((slot) => !slot.cancelled).findIndex((slot) => slot.playedOn === current.playedOn);
-    if (openAt < 0) return;
-    openPeople.splice(openAt, 1);
-    const after = openPeople.at(-1) ?? current.playerId;
-    const at = order.findIndex((player) => player.id === after);
-    const fill = order[(at + 1) % order.length];
-    if (fill) openPeople.push(fill.id);
-    let cursor = 0;
-    void persist(
-      slots.map((slot) => {
-        if (slot.cancelled) return slot;
-        const playerId = openPeople[cursor] ?? fill?.id ?? slot.playerId;
-        cursor += 1;
-        return { ...slot, playerId };
-      }),
-    );
+  async function moveOrder(index: number, delta: number) {
+    const target = index + delta;
+    if (busy || target < 0 || target >= order.length) return;
+    const nextOrder = [...order];
+    const [player] = nextOrder.splice(index, 1);
+    if (!player) return;
+    nextOrder.splice(target, 0, player);
+    setBusy(true);
+    setError("");
+    try {
+      const saved = await clientApi<ProfessorRoster>("/admin/professors", {
+        method: "PUT",
+        body: JSON.stringify({ playerIds: nextOrder.map((item) => item.id) }),
+      });
+      setOrder(saved.order);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Não consegui salvar a ordem.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   function cancelSlot(index: number) {
@@ -193,40 +199,27 @@ function ProfessorsRoster() {
     <Stack>
       <PanelHead $flush>
         <PageTitle>Professores</PageTitle>
+        <GhostButton type="button" disabled={!order.length} onClick={() => { setError(""); setOrderOpen(true); }}>
+          Ordem
+        </GhostButton>
       </PanelHead>
       {ready ? (
-        <Muted>A ordem não muda. Nas terças, no máximo se troca o jogo. Se alguém deixar de ir, use Editar para mudar o nome.</Muted>
+        <Muted>Nas terças, no máximo se troca o jogo. A sequência fica em Ordem.</Muted>
       ) : (
         <Muted>Abrindo a ordem...</Muted>
       )}
       {selected ? <SeasonSelect seasons={seasons} value={selected.code} path="/admin/professores" /> : null}
       {next ? (
         <Muted>
-          Próximo professor: {next.name}.{skipped ? ` ${skipped.name} está machucado e pulou a vez.` : ""}
+          Próximo professor: {next.name}.{skipSentence(skipped)}
         </Muted>
-      ) : skipped ? (
-        <Muted>Próximo professor: a definir. {skipped.name} está machucado.</Muted>
+      ) : skipped.length ? (
+        <Muted>
+          Próximo professor: a definir.{skipSentence(skipped)}
+        </Muted>
       ) : null}
-      {error ? <ErrorText>{error}</ErrorText> : null}
+      {error && !orderOpen && !editing ? <ErrorText>{error}</ErrorText> : null}
       {ready && !order.length && !error ? <Muted>Nenhum mensalista na ordem.</Muted> : null}
-      {order.length ? (
-        <Stack>
-          <SectionTitle>Ordem</SectionTitle>
-          <OrderGrid>
-            {order.map((player, index) => (
-              <OrderLine key={player.id}>
-                <Name>
-                  {index + 1}. {player.name}
-                  {player.injured ? " (machucado)" : ""}
-                </Name>
-                <MiniButton type="button" aria-label={`Editar ${player.name}`} disabled={busy} onClick={() => openEdit(player)}>
-                  Editar
-                </MiniButton>
-              </OrderLine>
-            ))}
-          </OrderGrid>
-        </Stack>
-      ) : null}
       {order.length ? (
         <Scroll>
           <SectionTitle>Jogos</SectionTitle>
@@ -248,14 +241,14 @@ function ProfessorsRoster() {
                   {row.kind === "future" && row.cancelled ? (
                     <Name>Sem professor</Name>
                   ) : row.kind === "future" ? (
-                    <Select aria-label={`Professor em ${formatShortDate(row.playedOn)}`} value={row.player.id} disabled={busy} onChange={(event) => changeProfessor(row.index, event.target.value)}>
+                    <ProfessorSelect aria-label={`Professor em ${formatShortDate(row.playedOn)}`} value={row.player.id} disabled={busy} onChange={(event) => changeProfessor(row.index, event.target.value)}>
                       {order.map((player) => (
                         <option key={player.id} value={player.id}>
                           {player.name}
                           {player.injured ? " (machucado)" : ""}
                         </option>
                       ))}
-                    </Select>
+                    </ProfessorSelect>
                   ) : (
                     <Name>{row.player.name}</Name>
                   )}
@@ -276,9 +269,6 @@ function ProfessorsRoster() {
                         <MiniButton type="button" aria-label={`Descer ${row.player.name} em ${formatShortDate(row.playedOn)}`} disabled={busy || row.index === slots.length - 1 || Boolean(slots[row.index + 1]?.cancelled)} onClick={() => swap(row.index, 1)}>
                           ↓
                         </MiniButton>
-                        <MiniButton type="button" aria-label={`Tirar ${row.player.name} em ${formatShortDate(row.playedOn)}`} disabled={busy} onClick={() => removeSlot(row.index)}>
-                          Tirar
-                        </MiniButton>
                         <MiniButton type="button" aria-label={`Cancelar jogo em ${formatShortDate(row.playedOn)}`} disabled={busy} onClick={() => cancelSlot(row.index)}>
                           Cancelar
                         </MiniButton>
@@ -291,8 +281,42 @@ function ProfessorsRoster() {
           </Grid>
         </Scroll>
       ) : null}
+      {orderOpen ? (
+        <Backdrop onMouseDown={() => setOrderOpen(false)}>
+          <OrderDialog role="dialog" aria-modal="true" aria-labelledby="order-title" onMouseDown={(event) => event.stopPropagation()}>
+            <h2 id="order-title">Ordem</h2>
+            <OrderList>
+              {order.map((player, index) => (
+                <OrderLine key={player.id}>
+                  <Name>
+                    {index + 1}. {player.name}
+                    {player.injured ? " (machucado)" : ""}
+                  </Name>
+                  <Arrows>
+                    <MiniButton type="button" aria-label={`Subir ${player.name} na ordem`} disabled={busy || index === 0} onClick={() => void moveOrder(index, -1)}>
+                      ↑
+                    </MiniButton>
+                    <MiniButton type="button" aria-label={`Descer ${player.name} na ordem`} disabled={busy || index === order.length - 1} onClick={() => void moveOrder(index, 1)}>
+                      ↓
+                    </MiniButton>
+                    <MiniButton type="button" aria-label={`Editar ${player.name}`} disabled={busy} onClick={() => openEdit(player)}>
+                      Editar
+                    </MiniButton>
+                  </Arrows>
+                </OrderLine>
+              ))}
+            </OrderList>
+            {error ? <ErrorText>{error}</ErrorText> : null}
+            <Actions>
+              <GhostButton type="button" onClick={() => setOrderOpen(false)}>
+                Fechar
+              </GhostButton>
+            </Actions>
+          </OrderDialog>
+        </Backdrop>
+      ) : null}
       {editing ? (
-        <Backdrop onMouseDown={() => setEditing(null)}>
+        <EditBackdrop onMouseDown={() => setEditing(null)}>
           <Dialog role="dialog" aria-modal="true" aria-labelledby="edit-player-title" onMouseDown={(event) => event.stopPropagation()}>
             <h2 id="edit-player-title">Editar jogador</h2>
             <form onSubmit={saveName}>
@@ -311,23 +335,19 @@ function ProfessorsRoster() {
               </Actions>
             </form>
           </Dialog>
-        </Backdrop>
+        </EditBackdrop>
       ) : null}
     </Stack>
   );
 }
 
 const Scroll = styled.div`
+  width: 100%;
+  min-width: 0;
   overflow-x: auto;
 `;
 
-const columns = "minmax(160px, 1.6fr) 118px 96px 72px 72px 280px";
-
-const OrderGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 8px 16px;
-`;
+const columns = "minmax(0, 1fr) 104px 84px 52px 64px 210px";
 
 const OrderLine = styled.div`
   display: flex;
@@ -346,6 +366,10 @@ const Backdrop = styled.div`
   place-items: center;
   padding: 20px;
   background: rgba(28, 16, 34, 0.46);
+`;
+
+const EditBackdrop = styled(Backdrop)`
+  z-index: 40;
 `;
 
 const Dialog = styled.div`
@@ -371,19 +395,39 @@ const Dialog = styled.div`
   }
 `;
 
+const OrderDialog = styled(Dialog)`
+  width: min(520px, 100%);
+  max-height: min(720px, calc(100vh - 40px));
+`;
+
+const OrderList = styled.div`
+  overflow: auto;
+  min-height: 0;
+`;
+
+const ProfessorSelect = styled(Select)`
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+`;
+
 const Grid = styled.div`
-  min-width: 860px;
+  width: 100%;
+  min-width: 0;
 `;
 
 const Head = styled.div`
   display: grid;
   grid-template-columns: ${columns};
-  column-gap: 12px;
+  column-gap: 8px;
   align-items: center;
   font-size: 13px;
   font-weight: 700;
   padding-bottom: 8px;
   border-bottom: 1px solid ${({ theme }) => theme.ink};
+  > * {
+    min-width: 0;
+  }
   > :last-child {
     justify-self: end;
   }
@@ -392,10 +436,13 @@ const Head = styled.div`
 const Line = styled.div`
   display: grid;
   grid-template-columns: ${columns};
-  column-gap: 12px;
+  column-gap: 8px;
   align-items: center;
   min-height: 44px;
   border-bottom: 1px solid ${({ theme }) => theme.line};
+  > * {
+    min-width: 0;
+  }
 `;
 
 const Name = styled.b`

@@ -113,11 +113,35 @@ export function lastProfessorId(matches: MatchDetail[]) {
   return best?.id ?? null;
 }
 
-export function nextProfessor<T extends { id: string; injured?: boolean }>(order: T[], assignedId: string | null | undefined, fallbackFromId: string | null) {
+function walkProfessorSlots<T extends { id: string; injured?: boolean }>(order: T[], slots: { playerId: string; cancelled?: boolean }[]) {
+  const byId = new Map(order.map((player) => [player.id, player]));
+  const skipped: T[] = [];
+  const seen = new Set<string>();
+  for (const slot of slots) {
+    if (slot.cancelled) continue;
+    const player = byId.get(slot.playerId);
+    if (!player) continue;
+    if (player.injured) {
+      if (!seen.has(player.id)) {
+        seen.add(player.id);
+        skipped.push(player);
+      }
+      continue;
+    }
+    return { next: player, skipped };
+  }
+  return { next: undefined, skipped };
+}
+
+export function skippedProfessors<T extends { id: string; injured?: boolean }>(order: T[], slots: { playerId: string; cancelled?: boolean }[]) {
+  return walkProfessorSlots(order, slots).skipped;
+}
+
+export function nextProfessor<T extends { id: string; injured?: boolean }>(order: T[], slots: { playerId: string; cancelled?: boolean }[], fallbackFromId: string | null) {
+  const found = walkProfessorSlots(order, slots);
+  if (found.next) return found.next;
   const blocked = order.filter((player) => player.injured).map((player) => player.id);
-  const assigned = assignedId ? order.find((player) => player.id === assignedId) : undefined;
-  if (assigned && !assigned.injured) return assigned;
-  return nextInRotation(order, assigned?.id ?? fallbackFromId, blocked);
+  return nextInRotation(order, fallbackFromId, blocked);
 }
 
 export function nextInRotation<T extends { id: string }>(order: T[], lastId: string | null, absentIds: Iterable<string>) {
@@ -195,7 +219,7 @@ export function buildCallList(players: PlayerRef[], matches: MatchDetail[], opti
   const future = buildFutureSlots(rotation, lastProfessorId(matches), upcomingTuesdays(matches, today), options.plans ?? []);
   const open = future.find((slot) => !slot.cancelled);
   const professor = rotation.length
-    ? nextProfessor(rotation, open?.playerId, lastProfessorId(matches))
+    ? nextProfessor(rotation, future, lastProfessorId(matches))
     : nextInRotation(
         [...roster].sort(byQueue(professorOn)),
         null,
@@ -224,7 +248,7 @@ export function buildCallList(players: PlayerRef[], matches: MatchDetail[], opti
         const place = position ? ` (${position})` : "";
         const count = row ? ` ${row.last10}/10` : "";
         const mark = meat ? " 🍖" : "";
-        return `${index + 1}. ${player.name}${mark}${place}${count}`;
+        return `${index + 1}. ${player.name}${place}${count}${mark}`;
       })
       .join("\n");
     return `${title}\n${body}`;

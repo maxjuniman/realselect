@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import styled from "styled-components";
 import { AdminLink, AdminNav, AdminShell, GhostButton, Muted } from "@/styles/ui";
 
 const links = [
@@ -13,6 +14,10 @@ const links = [
   { href: "/admin/sequencia", label: "Sequência" },
   { href: "/admin/temporadas", label: "Temporadas" },
 ];
+
+const AdminMain = styled.div`
+  min-width: 0;
+`;
 
 export default function PainelLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -55,7 +60,7 @@ export default function PainelLayout({ children }: { children: React.ReactNode }
         </GhostButton>
         <Link href="/">Ver site</Link>
       </AdminNav>
-      <div>{children}</div>
+      <AdminMain>{children}</AdminMain>
     </AdminShell>
   );
 }
