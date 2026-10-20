@@ -298,6 +298,85 @@ export async function adminRoutes(app: FastifyInstance) {
     return { id: created.id, name: created.name, email: created.email };
   });
 
+  app.patch<{ Params: { id: string } }>("/admin/organizers/:id", async (request, reply) => {
+    const user = await requireUser(request, reply);
+    if (!user) return;
+    const body = z
+      .object({
+        name: z.string().trim().min(2).max(60),
+        email: z.string().trim().email(),
+        password: z.string().min(4).max(60).optional(),
+      })
+      .safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ message: "Confira nome, e-mail e senha." });
+    const current = await prisma.user.findUnique({ where: { id: request.params.id } });
+    if (!current) return reply.code(404).send({ message: "Organizador não encontrado." });
+    const email = body.data.email.toLowerCase();
+    const taken = await prisma.user.findUnique({ where: { email } });
+    if (taken && taken.id !== current.id) return reply.code(409).send({ message: "Já existe um organizador com esse e-mail." });
+    const saved = await prisma.user.update({
+      where: { id: current.id },
+      data: {
+        name: body.data.name.trim(),
+        email,
+        ...(body.data.password ? { passwordHash: hashPassword(body.data.password) } : {}),
+      },
+      select: { id: true, name: true, email: true },
+    });
+    return saved;
+  });
+
+  app.delete<{ Params: { id: string } }>("/admin/organizers/:id", async (request, reply) => {
+    const user = await requireUser(request, reply);
+    if (!user) return;
+    if (user.id === request.params.id) return reply.code(400).send({ message: "Você não pode remover o próprio acesso." });
+    const total = await prisma.user.count();
+    if (total <= 1) return reply.code(400).send({ message: "O painel precisa de pelo menos um organizador." });
+    const current = await prisma.user.findUnique({ where: { id: request.params.id } });
+    if (!current) return reply.code(404).send({ message: "Organizador não encontrado." });
+    await prisma.user.delete({ where: { id: current.id } });
+    return { ok: true };
+  });
+
+  app.patch<{ Params: { id: string } }>("/admin/player-access/:id", async (request, reply) => {
+    const user = await requireUser(request, reply);
+    if (!user) return;
+    const body = z
+      .object({
+        name: z.string().trim().min(2).max(60),
+        birthDate: birthField,
+        password: z.string().min(4).max(60).optional(),
+        playerId: z.string().min(1),
+      })
+      .safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ message: "Confira o nome e o jogador vinculado." });
+    const account = await prisma.playerAccount.findUnique({ where: { id: request.params.id } });
+    if (!account) return reply.code(404).send({ message: "Cadastro não encontrado." });
+    const wanted = body.data.name.trim().toLocaleLowerCase("pt-BR");
+    const accounts = await prisma.playerAccount.findMany({ select: { id: true, name: true } });
+    if (accounts.some((item) => item.id !== account.id && item.name.trim().toLocaleLowerCase("pt-BR") === wanted)) {
+      return reply.code(409).send({ message: "Já existe um cadastro com esse nome." });
+    }
+    const player = await prisma.player.findUnique({ where: { id: body.data.playerId } });
+    if (!player || player.name === "Gol contra") return reply.code(404).send({ message: "Jogador não encontrado." });
+    const taken = await prisma.playerAccount.findUnique({ where: { playerId: player.id } });
+    if (taken && taken.id !== account.id) return reply.code(409).send({ message: "Esse jogador já está vinculado a outro acesso." });
+    const birthDate = body.data.birthDate ? isoToDate(body.data.birthDate) : null;
+    await prisma.playerAccount.update({
+      where: { id: account.id },
+      data: {
+        name: body.data.name.trim(),
+        birthDate,
+        playerId: player.id,
+        ...(body.data.password ? { passwordHash: hashPassword(body.data.password) } : {}),
+      },
+    });
+    if (!player.birthDate && birthDate) {
+      await prisma.player.update({ where: { id: player.id }, data: { birthDate } });
+    }
+    return { ok: true };
+  });
+
   app.post("/admin/matches", async (request, reply) => {
     const user = await requireUser(request, reply);
     if (!user) return;
