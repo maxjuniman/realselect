@@ -7,6 +7,7 @@ import styled from "styled-components";
 const links = [
   { href: "/", label: "Classificação" },
   { href: "/jogos", label: "Jogos" },
+  { href: "/historico", label: "Histórico" },
   { href: "/artilharia", label: "Artilharia" },
   { href: "/presenca", label: "Presença" },
 ];
@@ -58,7 +59,7 @@ const Brand = styled(Link)`
 
 const Nav = styled.nav`
   display: flex;
-  gap: 4px 18px;
+  gap: 4px 14px;
   flex: 1;
   @media (max-width: 860px) {
     display: none;
