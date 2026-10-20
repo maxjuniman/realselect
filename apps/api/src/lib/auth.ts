@@ -19,7 +19,8 @@ export async function createUser(name: string, email: string, password: string) 
 
 export async function login(email: string, password: string) {
   const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
-  if (!user || !bcrypt.compareSync(password, user.passwordHash)) return null;
+  if (!user) return null;
+  if (!bcrypt.compareSync(password, user.passwordHash)) return { invalid: true as const };
   const token = jwt.sign({ sub: user.id, role: "admin", email: user.email }, secret(), { expiresIn: "30d" });
   return { token, user: { id: user.id, name: user.name, email: user.email } };
 }

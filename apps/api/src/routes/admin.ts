@@ -74,11 +74,16 @@ export async function adminRoutes(app: FastifyInstance) {
     if (!body.success || !identity) return reply.code(400).send({ message: "Informe o e-mail ou o nome, e a senha." });
     if (identity.includes("@")) {
       const session = await login(identity, body.data.password);
-      if (!session) return reply.code(401).send({ message: "E-mail ou senha incorretos." });
-      return session;
+      if (session && "token" in session) return session;
+      if (session?.invalid) return reply.code(401).send({ message: "E-mail ou senha incorretos." });
     }
     const session = await loginPlayer(identity, body.data.password);
-    if ("error" in session) return reply.code(401).send({ message: session.error });
+    if ("error" in session) {
+      if (identity.includes("@") && (session.error === "Cadastre-se para pedir acesso." || session.error === "Nome ou senha incorretos.")) {
+        return reply.code(401).send({ message: "E-mail ou senha incorretos." });
+      }
+      return reply.code(401).send({ message: session.error });
+    }
     return session;
   });
 
