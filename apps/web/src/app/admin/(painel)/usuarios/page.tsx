@@ -24,6 +24,8 @@ type Editor =
   | { kind: "player"; id: string }
   | { kind: "revoke"; id: string };
 
+const labels = { pending: "Esperando", approved: "Liberado", denied: "Recusado" };
+
 export default function UsersPage() {
   const session = useSession();
   const [organizers, setOrganizers] = useState<Organizer[]>([]);
@@ -35,11 +37,12 @@ export default function UsersPage() {
   const [password, setPassword] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [playerId, setPlayerId] = useState("");
+  const [choice, setChoice] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [deciding, setDeciding] = useState("");
 
   const mine = session?.role === "admin" ? session.id : "";
-  const granted = rows.filter((row) => row.access === "approved");
 
   async function load() {
     const [users, access, roster] = await Promise.all([
@@ -114,6 +117,22 @@ export default function UsersPage() {
     }
   }
 
+  async function decide(accountId: string, access: "approved" | "denied", linkedId?: string) {
+    setDeciding(accountId);
+    setError("");
+    try {
+      await clientApi("/admin/player-access", {
+        method: "POST",
+        body: JSON.stringify({ accountId, access, playerId: linkedId || null }),
+      });
+      await load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Não foi possível salvar a decisão.");
+    } finally {
+      setDeciding("");
+    }
+  }
+
   async function savePlayer(event: FormEvent) {
     event.preventDefault();
     if (editor?.kind !== "player") return;
@@ -125,7 +144,7 @@ export default function UsersPage() {
         body: JSON.stringify({
           name,
           birthDate: birthDate || null,
-          playerId,
+          playerId: playerId || null,
           ...(password ? { password } : {}),
         }),
       });
@@ -158,11 +177,12 @@ export default function UsersPage() {
 
   const removing = editor?.kind === "remove" ? organizers.find((item) => item.id === editor.id) : null;
   const revoking = editor?.kind === "revoke" ? rows.find((item) => item.id === editor.id) : null;
+  const editing = editor?.kind === "player" ? rows.find((item) => item.id === editor.id) : null;
 
   return (
     <Stack>
       <PageTitle>Usuários</PageTitle>
-      <Muted>Quem pode entrar no painel. Organizador entra com o e-mail. Jogador entra com o nome, depois de aprovado em Acessos.</Muted>
+      <Muted>Quem pode entrar no painel. Organizador entra com o e-mail. Jogador entra com o nome, depois que o cadastro for aprovado.</Muted>
       {error && !editor ? <ErrorText>{error}</ErrorText> : null}
 
       <Head>
@@ -196,30 +216,57 @@ export default function UsersPage() {
       </List>
 
       <SectionTitle>Jogadores</SectionTitle>
-      {granted.length ? (
+      <Muted>O cadastro não cria jogador. Vincule o pedido a alguém que já está na lista.</Muted>
+      {rows.length ? (
         <List>
-          {granted.map((row) => (
-            <Row key={row.id}>
-              <Who>
-                <strong>{row.name}</strong>
-                <Status>
-                  {row.player ? row.player.name : "Sem jogador"}
-                  {row.birthDate ? ` · ${formatShortDate(row.birthDate)}` : ""}
-                </Status>
-              </Who>
-              <Actions>
-                <TextButton type="button" aria-label={`Editar ${row.name}`} onClick={() => openPlayer(row)}>
-                  Editar
-                </TextButton>
-                <TextButton type="button" aria-label={`Tirar acesso de ${row.name}`} onClick={() => setEditor({ kind: "revoke", id: row.id })}>
-                  Tirar acesso
-                </TextButton>
-              </Actions>
-            </Row>
-          ))}
+          {rows.map((row) => {
+            const selected = choice[row.id] ?? row.player?.id ?? "";
+            const sameApproved = row.access === "approved" && selected === row.player?.id;
+            return (
+              <PlayerRow key={row.id} $linked={row.access === "approved"}>
+                <Who>
+                  <strong>{row.name}</strong>
+                  <Status>
+                    {labels[row.access]}
+                    {row.birthDate ? ` · ${formatShortDate(row.birthDate)}` : ""}
+                    {row.player ? ` · ${row.player.name}` : ""}
+                  </Status>
+                </Who>
+                {row.access === "approved" ? null : (
+                  <Select aria-label={`Vincular ${row.name}`} value={selected} onChange={(event) => setChoice((current) => ({ ...current, [row.id]: event.target.value }))}>
+                    <option value="">Escolher jogador</option>
+                    {players.map((player) => (
+                      <option key={player.id} value={player.id}>
+                        {player.name}
+                      </option>
+                    ))}
+                  </Select>
+                )}
+                <Actions>
+                  {sameApproved ? null : (
+                    <TextButton type="button" aria-label={`Aprovar ${row.name}`} disabled={deciding === row.id || !selected} onClick={() => decide(row.id, "approved", selected)}>
+                      Aprovar
+                    </TextButton>
+                  )}
+                  {row.access === "denied" ? null : row.access === "approved" ? (
+                    <TextButton type="button" aria-label={`Tirar acesso de ${row.name}`} onClick={() => setEditor({ kind: "revoke", id: row.id })}>
+                      Tirar acesso
+                    </TextButton>
+                  ) : (
+                    <TextButton type="button" aria-label={`Recusar ${row.name}`} disabled={deciding === row.id} onClick={() => decide(row.id, "denied")}>
+                      Recusar
+                    </TextButton>
+                  )}
+                  <TextButton type="button" aria-label={`Editar ${row.name}`} onClick={() => openPlayer(row)}>
+                    Editar
+                  </TextButton>
+                </Actions>
+              </PlayerRow>
+            );
+          })}
         </List>
       ) : (
-        <Muted>Nenhum jogador liberado. Os pedidos ficam em Acessos.</Muted>
+        <Muted>Nenhum cadastro por enquanto.</Muted>
       )}
 
       {editor?.kind === "create" || editor?.kind === "organizer" ? (
@@ -276,7 +323,7 @@ export default function UsersPage() {
             </Field>
             <Field>
               Jogador vinculado
-              <Select value={playerId} onChange={(event) => setPlayerId(event.target.value)} required>
+              <Select value={playerId} onChange={(event) => setPlayerId(event.target.value)} required={editing?.access === "approved"}>
                 <option value="">Escolher jogador</option>
                 {players.map((player) => (
                   <option key={player.id} value={player.id}>
@@ -297,7 +344,7 @@ export default function UsersPage() {
               />
             </Field>
             {error ? <ErrorText>{error}</ErrorText> : null}
-            <PrimaryButton disabled={busy || !playerId}>{busy ? "Salvando..." : "Salvar"}</PrimaryButton>
+            <PrimaryButton disabled={busy || (editing?.access === "approved" && !playerId)}>{busy ? "Salvando..." : "Salvar"}</PrimaryButton>
           </Dialog>
         </Backdrop>
       ) : null}
@@ -330,7 +377,7 @@ export default function UsersPage() {
             <DialogHead>
               <h2 id="revoke-user-title">Tirar acesso</h2>
             </DialogHead>
-            <Muted>{revoking.name} deixa de entrar no painel. O pedido continua em Acessos, como recusado.</Muted>
+            <Muted>{revoking.name} deixa de entrar no painel. O cadastro fica recusado.</Muted>
             {error ? <ErrorText>{error}</ErrorText> : null}
             <DialogActions>
               <GhostButton type="button" onClick={close}>
@@ -386,6 +433,18 @@ const Actions = styled.div`
   gap: 14px;
 `;
 
+const PlayerRow = styled.div<{ $linked?: boolean }>`
+  display: grid;
+  grid-template-columns: ${({ $linked }) => ($linked ? "minmax(0, 1fr) auto" : "minmax(0, 1fr) minmax(180px, 240px) auto")};
+  gap: 12px;
+  align-items: center;
+  padding: 12px 0;
+  border-top: 1px solid ${({ theme }) => theme.line};
+  @media (max-width: 720px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
 const TextButton = styled.button`
   border: 0;
   padding: 0;
@@ -394,6 +453,9 @@ const TextButton = styled.button`
   font: inherit;
   font-weight: 700;
   cursor: pointer;
+  &:disabled {
+    opacity: 0.5;
+  }
 `;
 
 const Backdrop = styled.div`

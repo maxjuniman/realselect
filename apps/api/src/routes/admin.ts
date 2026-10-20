@@ -346,7 +346,7 @@ export async function adminRoutes(app: FastifyInstance) {
         name: z.string().trim().min(2).max(60),
         birthDate: birthField,
         password: z.string().min(4).max(60).optional(),
-        playerId: z.string().min(1),
+        playerId: z.string().min(1).nullable().optional(),
       })
       .safeParse(request.body);
     if (!body.success) return reply.code(400).send({ message: "Confira o nome e o jogador vinculado." });
@@ -357,23 +357,31 @@ export async function adminRoutes(app: FastifyInstance) {
     if (accounts.some((item) => item.id !== account.id && item.name.trim().toLocaleLowerCase("pt-BR") === wanted)) {
       return reply.code(409).send({ message: "Já existe um cadastro com esse nome." });
     }
-    const player = await prisma.player.findUnique({ where: { id: body.data.playerId } });
-    if (!player || player.name === "Gol contra") return reply.code(404).send({ message: "Jogador não encontrado." });
-    const taken = await prisma.playerAccount.findUnique({ where: { playerId: player.id } });
-    if (taken && taken.id !== account.id) return reply.code(409).send({ message: "Esse jogador já está vinculado a outro acesso." });
+    let playerId = account.playerId;
+    if (body.data.playerId === null) {
+      if (account.access === "approved") return reply.code(400).send({ message: "Escolha o jogador vinculado." });
+      playerId = null;
+    } else if (body.data.playerId) {
+      const player = await prisma.player.findUnique({ where: { id: body.data.playerId } });
+      if (!player || player.name === "Gol contra") return reply.code(404).send({ message: "Jogador não encontrado." });
+      const taken = await prisma.playerAccount.findUnique({ where: { playerId: player.id } });
+      if (taken && taken.id !== account.id) return reply.code(409).send({ message: "Esse jogador já está vinculado a outro acesso." });
+      playerId = player.id;
+      const birthDate = body.data.birthDate ? isoToDate(body.data.birthDate) : null;
+      if (!player.birthDate && birthDate) {
+        await prisma.player.update({ where: { id: player.id }, data: { birthDate } });
+      }
+    }
     const birthDate = body.data.birthDate ? isoToDate(body.data.birthDate) : null;
     await prisma.playerAccount.update({
       where: { id: account.id },
       data: {
         name: body.data.name.trim(),
         birthDate,
-        playerId: player.id,
+        playerId,
         ...(body.data.password ? { passwordHash: hashPassword(body.data.password) } : {}),
       },
     });
-    if (!player.birthDate && birthDate) {
-      await prisma.player.update({ where: { id: player.id }, data: { birthDate } });
-    }
     return { ok: true };
   });
 

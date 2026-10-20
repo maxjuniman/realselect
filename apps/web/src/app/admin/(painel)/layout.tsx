@@ -16,7 +16,6 @@ const adminLinks = [
   { href: "/admin/professores", label: "Professores" },
   { href: "/admin/sequencia", label: "Sequência" },
   { href: "/admin/temporadas", label: "Temporadas" },
-  { href: "/admin/acessos", label: "Acessos" },
   { href: "/admin/usuarios", label: "Usuários" },
 ];
 
