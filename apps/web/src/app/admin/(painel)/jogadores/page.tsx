@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import styled from "styled-components";
 import { useSession } from "@/components/Session";
 import { clientApi } from "@/lib/client";
@@ -52,6 +52,7 @@ export default function PlayersAdminPage() {
   });
   const [draft, setDraft] = useState<Draft | null>(null);
   const [error, setError] = useState("");
+  const photoRef = useRef<HTMLInputElement>(null);
 
   async function load() {
     const data = await clientApi<PlayerRef[]>("/players");
@@ -290,18 +291,27 @@ export default function PlayersAdminPage() {
               Data de nascimento
               <TextInput type="date" value={draft.birthDate} onChange={(event) => setDraft({ ...draft, birthDate: event.target.value })} />
             </Field>
-            <Field>
-              Foto
-              <PhotoRow>
-                {preview ? <Face src={preview} alt="" /> : <Muted>Sem foto</Muted>}
-                <PhotoFile type="file" accept="image/*" onChange={(event) => pickPhoto(event.target.files?.[0])} />
-              </PhotoRow>
+            <PhotoBlock>
+              <span>Foto</span>
+              <PhotoButton type="button" aria-label={preview ? "Trocar foto" : "Escolher foto"} onClick={() => photoRef.current?.click()}>
+                {preview ? <Portrait src={preview} alt="" /> : <PersonShadow />}
+              </PhotoButton>
               {preview ? (
                 <TextButton type="button" onClick={() => setDraft({ ...draft, photoData: null, clearPhoto: true, photo: null })}>
                   Tirar foto
                 </TextButton>
               ) : null}
-            </Field>
+              <PhotoFile
+                ref={photoRef}
+                type="file"
+                accept="image/*"
+                tabIndex={-1}
+                onChange={(event) => {
+                  pickPhoto(event.target.files?.[0]);
+                  event.target.value = "";
+                }}
+              />
+            </PhotoBlock>
             {mine ? (
               <Field>
                 Nova senha
@@ -401,6 +411,14 @@ function SwapIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
       <path d="M7 8h11l-3.2-3.2M17 16H6l3.2 3.2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+function PersonShadow() {
+  return (
+    <svg width="78" height="78" viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="currentColor" d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm0 2c-4.4 0-8 2.2-8 5v1h16v-1c0-2.8-3.6-5-8-5z" />
     </svg>
   );
 }
@@ -561,14 +579,43 @@ const Face = styled.img`
   background: ${({ theme }) => theme.line};
 `;
 
-const PhotoRow = styled.div`
+const PhotoBlock = styled.div`
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  font-weight: 600;
+`;
+
+const PhotoButton = styled.button`
+  width: 96px;
+  height: 96px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  cursor: pointer;
+  color: ${({ theme }) => theme.muted};
+  background: ${({ theme }) => theme.line};
+`;
+
+const Portrait = styled.img`
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 `;
 
 const PhotoFile = styled.input`
-  font: inherit;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  border: 0;
 `;
 
 const TextButton = styled.button`
