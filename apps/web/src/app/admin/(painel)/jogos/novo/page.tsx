@@ -10,7 +10,7 @@ export default async function NewLineupPage() {
   return (
     <Stack>
       <PageTitle>Novo jogo</PageTitle>
-      <Muted>Monte só a escalação. O placar, os gols e o professor entram depois que a terça acontecer.</Muted>
+      <Muted>Monte a escalação, ou cole a lista com as cores e o placar para separar os times.</Muted>
       <MatchForm players={players} seasons={seasons} lineupOnly />
     </Stack>
   );

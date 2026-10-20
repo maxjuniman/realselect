@@ -6,11 +6,13 @@ import styled from "styled-components";
 import { clientApi } from "@/lib/client";
 import { formatDiff, nextTuesday, seasonCodeFromDate } from "@/lib/format";
 import { positionRank } from "@/lib/roster";
+import { parseTeamList } from "@/lib/team-list";
 import {
   Actions,
   Bucket,
   Check,
   DangerButton,
+  ErrorText,
   Field,
   GhostButton,
   Guest,
@@ -56,6 +58,9 @@ export function MatchForm({
   const [query, setQuery] = useState("");
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
+  const [listText, setListText] = useState("");
+  const [listError, setListError] = useState("");
+  const [fromList, setFromList] = useState(false);
   const [sides, setSides] = useState<Record<string, Side>>(() => {
     const map: Record<string, Side> = {};
     initial?.teamA.forEach((player) => (map[player.id] = "A"));
@@ -89,6 +94,7 @@ export function MatchForm({
   const teamB = players.filter((player) => sides[player.id] === "B");
   const playing = [...teamA, ...teamB];
   const tuesday = new Date(`${playedOn}T12:00:00`).getUTCDay() === 2;
+  const scoring = !lineupOnly || fromList;
 
   function setSide(id: string, side: Side) {
     setSides((current) => ({ ...current, [id]: side }));
@@ -99,12 +105,30 @@ export function MatchForm({
     setter((current) => ({ ...current, [id]: Math.max(0, (current[id] ?? 0) + delta) }));
   }
 
+  function applyList() {
+    const parsed = parseTeamList(listText, players);
+    if (!parsed.ok) {
+      setListError(parsed.message);
+      return;
+    }
+    const next: Record<string, Side> = {};
+    parsed.teamA.forEach((player) => (next[player.id] = "A"));
+    parsed.teamB.forEach((player) => (next[player.id] = "B"));
+    setSides(next);
+    setColorA(parsed.colorA);
+    setScoreA(parsed.scoreA);
+    setScoreB(parsed.scoreB);
+    setKeepDiff(false);
+    setFromList(true);
+    setListError("");
+  }
+
   function askSave() {
     if (!teamA.length || !teamB.length) {
       setNotice({ step: "result", ok: false, message: "Coloque pelo menos um jogador em cada time." });
       return;
     }
-    if (!lineupOnly && !keepDiff && (Number.isNaN(scoreA) || Number.isNaN(scoreB))) {
+    if (scoring && !keepDiff && (Number.isNaN(scoreA) || Number.isNaN(scoreB))) {
       setNotice({ step: "result", ok: false, message: "Informe o placar dos dois times." });
       return;
     }
@@ -117,17 +141,17 @@ export function MatchForm({
       const body = {
         playedOn,
         seasonCode,
-        scoreA: lineupOnly || keepDiff ? null : scoreA,
-        scoreB: lineupOnly || keepDiff ? null : scoreB,
-        goalDiffA: lineupOnly ? 0 : initial?.goalDiffA ?? 0,
-        professorId: lineupOnly ? null : professorId || null,
-        scheduled: lineupOnly,
+        scoreA: scoring && !keepDiff ? scoreA : null,
+        scoreB: scoring && !keepDiff ? scoreB : null,
+        goalDiffA: scoring && !keepDiff ? scoreA - scoreB : lineupOnly ? 0 : initial?.goalDiffA ?? 0,
+        professorId: scoring ? professorId || null : null,
+        scheduled: !scoring,
         colorA,
         appearances: [
           ...teamA.map((player) => ({ playerId: player.id, team: "A" })),
           ...teamB.map((player) => ({ playerId: player.id, team: "B" })),
         ],
-        events: lineupOnly ? [] : playing.flatMap((player) => {
+        events: !scoring ? [] : playing.flatMap((player) => {
           const items = [];
           if (goals[player.id]) items.push({ playerId: player.id, type: "goal", count: goals[player.id] });
           if (assists[player.id]) items.push({ playerId: player.id, type: "assist", count: assists[player.id] });
@@ -140,7 +164,7 @@ export function MatchForm({
       setNotice({
         step: "result",
         ok: true,
-        message: lineupOnly ? "Escalação salva." : "Jogo salvo.",
+        message: scoring ? "Jogo salvo." : "Escalação salva.",
         href: `/admin/jogos/${saved.id}`,
       });
     } catch (caught) {
@@ -172,7 +196,25 @@ export function MatchForm({
 
   return (
     <Stack>
-      {lineupOnly ? (
+      {!initial ? (
+        <Paste>
+          <Field>
+            Lista dos times
+            <ListInput
+              value={listText}
+              rows={12}
+              placeholder={"VERDE 8\nMarciano\n\nROXO 3\nEdy"}
+              onChange={(event) => setListText(event.target.value)}
+            />
+          </Field>
+          <Muted>Cole as cores e o placar. O sistema separa os times para você conferir antes de salvar.</Muted>
+          {listError ? <ErrorText>{listError}</ErrorText> : null}
+          <GhostButton type="button" onClick={applyList}>
+            Separar times
+          </GhostButton>
+        </Paste>
+      ) : null}
+      {!scoring ? (
         <Field>
           Data
           <TextInput
@@ -248,7 +290,7 @@ export function MatchForm({
       </ColorRow>
 
       <Picker>
-        <TeamBucket title="Time A" count={teamA.length} tone={colorA} players={teamA} goals={goals} assists={assists} onMove={setSide} onBump={bump} events={!lineupOnly} />
+        <TeamBucket title="Time A" count={teamA.length} tone={colorA} players={teamA} goals={goals} assists={assists} onMove={setSide} onBump={bump} events={scoring} />
         <Bucket>
           <h3>Fora</h3>
           {visible
@@ -266,10 +308,10 @@ export function MatchForm({
               </Person>
             ))}
         </Bucket>
-        <TeamBucket title="Time B" count={teamB.length} tone={colorA === "verde" ? "roxo" : "verde"} players={teamB} goals={goals} assists={assists} onMove={setSide} onBump={bump} events={!lineupOnly} />
+        <TeamBucket title="Time B" count={teamB.length} tone={colorA === "verde" ? "roxo" : "verde"} players={teamB} goals={goals} assists={assists} onMove={setSide} onBump={bump} events={scoring} />
       </Picker>
 
-      {lineupOnly ? null : (
+      {!scoring ? null : (
       <Field>
         Professor da rodada
         <Select value={professorId} onChange={(event) => setProfessorId(event.target.value)}>
@@ -288,7 +330,7 @@ export function MatchForm({
 
       <Actions>
         <PrimaryButton type="button" disabled={saving} onClick={askSave}>
-          {saving ? "Salvando..." : lineupOnly ? "Salvar escalação" : "Salvar jogo"}
+          {saving ? "Salvando..." : scoring ? "Salvar jogo" : "Salvar escalação"}
         </PrimaryButton>
         {initial ? (
           <DangerButton type="button" disabled={saving} onClick={() => setNotice({ step: "confirm", action: "delete" })}>
@@ -301,7 +343,7 @@ export function MatchForm({
           <Dialog role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
             {notice.step === "confirm" ? (
               <>
-                <h2>{notice.action === "delete" ? "Apagar este jogo?" : lineupOnly ? "Salvar esta escalação?" : "Salvar este jogo?"}</h2>
+                <h2>{notice.action === "delete" ? "Apagar este jogo?" : scoring ? "Salvar este jogo?" : "Salvar esta escalação?"}</h2>
                 <Muted>{notice.action === "delete" ? "Ele sai da classificação." : "Confira times, placar e professor antes de confirmar."}</Muted>
                 <Actions>
                   <GhostButton type="button" onClick={() => setNotice(null)}>
@@ -408,6 +450,28 @@ function TeamBucket({
     </Bucket>
   );
 }
+
+const Paste = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+`;
+
+const ListInput = styled.textarea`
+  width: 100%;
+  min-height: 220px;
+  resize: vertical;
+  border: 1px solid ${({ theme }) => theme.ink};
+  background: ${({ theme }) => theme.card};
+  border-radius: 0;
+  padding: 10px 12px;
+  font: inherit;
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.purpleDeep};
+    outline-offset: 2px;
+  }
+`;
 
 const paint = {
   verde: "#008000",
