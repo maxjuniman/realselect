@@ -1,21 +1,18 @@
 import { formatDiff, formatPercent, formatShortDate } from "./format";
 import { seasonBands, type HistoryColumn, type HistoryRow } from "./history";
-import { drawBanner, drawFooter, fitText, paintSheet, sharePng, sheet } from "./share-image";
+import { drawBanner, drawFooter, fitText, paintSheet, sheet } from "./share-image";
 import type { StandingRow } from "./types";
 
-export async function shareStandingsImage(seasonName: string, rows: StandingRow[]) {
-  const blob = await drawStandings(seasonName, rows);
-  return sharePng(blob, "classificacao-real-select.png", "Classificação do Real Select");
+export function standingsImage(seasonName: string, rows: StandingRow[]) {
+  return drawStandings(seasonName, rows);
 }
 
-export async function shareProfessorsImage(seasonName: string, rows: ProfessorImageRow[]) {
-  const blob = await drawProfessors(seasonName, rows);
-  return sharePng(blob, "professores-real-select.png", "Professores do Real Select");
+export function professorsImage(seasonName: string, rows: ProfessorImageRow[]) {
+  return drawProfessors(seasonName, rows);
 }
 
-export async function shareHistoryImage(title: string, columns: HistoryColumn[], rows: HistoryRow[]) {
-  const blob = await drawHistory(title, columns, rows);
-  return sharePng(blob, "historico-real-select.png", "Histórico do Real Select");
+export function historyImage(title: string, columns: HistoryColumn[], rows: HistoryRow[]) {
+  return drawHistory(title, columns, rows);
 }
 
 export type ProfessorImageRow = {

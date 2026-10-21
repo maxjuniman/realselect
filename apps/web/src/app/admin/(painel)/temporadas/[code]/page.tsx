@@ -85,7 +85,7 @@ export default function SeasonDataPage() {
         })}
       </Actions>
 
-      {view === "classificacao" && table ? <StandingsTable rows={table.rows} seasonName={table.season.name} /> : null}
+      {view === "classificacao" && table ? <StandingsTable rows={table.rows} seasonName={table.season.name} share /> : null}
 
       {view === "artilharia" && scorers ? (
         <Panel>

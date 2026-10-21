@@ -31,12 +31,12 @@ export type HistoryRow = {
   cells: (HistoryCell | null)[];
 };
 
-export function historyHref(primary: string, extras: string[]) {
+export function historyHref(primary: string, extras: string[], path = "/historico") {
   const params = new URLSearchParams();
   params.set("temporada", primary);
   const more = extras.filter((code) => code && code !== primary);
   if (more.length) params.set("mais", more.join(","));
-  return `/historico?${params.toString()}`;
+  return `${path}?${params.toString()}`;
 }
 
 export function extraSeasonCodes(raw: string | undefined, seasons: Season[], primary: string) {

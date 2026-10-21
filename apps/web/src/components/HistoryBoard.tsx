@@ -6,7 +6,7 @@ import styled from "styled-components";
 import { ShareImageButton } from "@/components/ShareImageButton";
 import { formatShortDate, resultLabel } from "@/lib/format";
 import { historyHref, seasonBands, type HistoryColumn, type HistoryRow } from "@/lib/history";
-import { shareHistoryImage } from "@/lib/table-image";
+import { historyImage } from "@/lib/table-image";
 import type { Season } from "@/lib/types";
 import { Empty, PanelHead, Rules, SectionTitle, Select } from "@/styles/ui";
 
@@ -207,12 +207,16 @@ export function HistoryBoard({
   extras,
   columns,
   rows,
+  share = false,
+  path = "/historico",
 }: {
   seasons: Season[];
   primary: string;
   extras: string[];
   columns: HistoryColumn[];
   rows: HistoryRow[];
+  share?: boolean;
+  path?: string;
 }) {
   const router = useRouter();
   const bands = seasonBands(columns);
@@ -226,7 +230,7 @@ export function HistoryBoard({
   const others = seasons.filter((season) => season.code !== primary);
 
   function open(nextPrimary: string, nextExtras: string[]) {
-    router.push(historyHref(nextPrimary, nextExtras), { scroll: false });
+    router.push(historyHref(nextPrimary, nextExtras, path), { scroll: false });
   }
 
   return (
@@ -265,7 +269,13 @@ export function HistoryBoard({
         </SeasonList>
       </Filters>
       <Rules>Cada casa é a pontuação da terça. A soma fica na última coluna.</Rules>
-      <ShareImageButton disabled={!rows.length || !columns.length} onShare={() => shareHistoryImage(imageTitle || "Temporadas", columns, rows)} />
+      {share ? (
+        <ShareImageButton
+          disabled={!rows.length || !columns.length}
+          filename="historico-real-select.png"
+          onImage={() => historyImage(imageTitle || "Temporadas", columns, rows)}
+        />
+      ) : null}
       <Legend>
         <li>
           <Swatch $tone="win" />3 vitória

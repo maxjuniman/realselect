@@ -9,7 +9,7 @@ import { buildFutureSlots, lastProfessorId, nextProfessor, skippedProfessors, up
 import { clientApi } from "@/lib/client";
 import { formatShortDate, seasonCodeFromDate } from "@/lib/format";
 import { placar, winnerTone } from "@/lib/score";
-import { shareProfessorsImage, type ProfessorImageRow } from "@/lib/table-image";
+import { professorsImage, type ProfessorImageRow } from "@/lib/table-image";
 import type { MatchDetail, ProfessorRoster, Season } from "@/lib/types";
 import { Actions, ErrorText, Field, GhostButton, MiniButton, Muted, PageTitle, PanelHead, PrimaryButton, ScoreText, SectionTitle, Select, Stack, TextInput } from "@/styles/ui";
 
@@ -256,7 +256,8 @@ function ProfessorsRoster() {
             <SectionTitle>Jogos</SectionTitle>
             <ShareImageButton
               disabled={!rows.length}
-              onShare={() => shareProfessorsImage(selected?.name ?? "Temporada", rows.map(professorImageRow))}
+              filename="professores-real-select.png"
+              onImage={() => professorsImage(selected?.name ?? "Temporada", rows.map(professorImageRow))}
             />
           </ShareRow>
           <Grid>

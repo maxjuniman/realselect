@@ -1,18 +1,25 @@
-export async function sharePng(blob: Blob, filename: string, title: string) {
-  const file = new File([blob], filename, { type: "image/png" });
-  const payload = { files: [file], title };
-  const automated = navigator.webdriver === true;
-  if (!automated && typeof navigator.share === "function" && navigator.canShare?.(payload)) {
-    await navigator.share(payload);
-    return "shared" as const;
-  }
+export async function downloadPng(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = file.name;
+  link.download = filename;
   link.click();
   window.setTimeout(() => URL.revokeObjectURL(url), 1500);
-  return "downloaded" as const;
+}
+
+export async function copyPng(image: Promise<Blob>) {
+  if (typeof ClipboardItem === "undefined" || !navigator.clipboard?.write) {
+    throw new Error("Este navegador não copia a imagem. Baixe o arquivo e anexe no WhatsApp.");
+  }
+  const png = image.then((blob) => (blob.type === "image/png" ? blob : new Blob([blob], { type: "image/png" })));
+  try {
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
+  } catch (caught) {
+    if (caught instanceof Error && caught.name === "NotAllowedError") {
+      throw new Error("O navegador bloqueou a cópia. Baixe o arquivo e anexe no WhatsApp.");
+    }
+    throw caught;
+  }
 }
 
 const ink = "#1c1022";
