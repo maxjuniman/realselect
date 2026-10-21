@@ -4,10 +4,12 @@ import { FormEvent, Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import styled from "styled-components";
 import { SeasonSelect } from "@/components/SeasonSelect";
+import { ShareImageButton } from "@/components/ShareImageButton";
 import { buildFutureSlots, lastProfessorId, nextProfessor, skippedProfessors, upcomingTuesdays } from "@/lib/call-list";
 import { clientApi } from "@/lib/client";
 import { formatShortDate, seasonCodeFromDate } from "@/lib/format";
 import { placar, winnerTone } from "@/lib/score";
+import { shareProfessorsImage, type ProfessorImageRow } from "@/lib/table-image";
 import type { MatchDetail, ProfessorRoster, Season } from "@/lib/types";
 import { Actions, ErrorText, Field, GhostButton, MiniButton, Muted, PageTitle, PanelHead, PrimaryButton, ScoreText, SectionTitle, Select, Stack, TextInput } from "@/styles/ui";
 
@@ -23,6 +25,34 @@ function professorSaldo(match: MatchDetail) {
 function scoreOf(match: MatchDetail) {
   if (match.scoreA !== null && match.scoreB !== null) return `${match.scoreA}x${match.scoreB}`;
   return placar(match);
+}
+
+function professorImageRow(row: {
+  kind: "played" | "future";
+  player: { name: string };
+  game?: MatchDetail;
+  playedOn?: string;
+  season?: string;
+  cancelled?: boolean;
+}): ProfessorImageRow {
+  if (row.kind === "played" && row.game) {
+    return {
+      name: row.player.name,
+      date: formatShortDate(row.game.playedOn),
+      season: row.game.season.code,
+      saldo: professorSaldo(row.game),
+      placar: scoreOf(row.game),
+      tone: winnerTone(row.game),
+    };
+  }
+  return {
+    name: row.cancelled ? "Sem professor" : row.player.name,
+    date: formatShortDate(row.playedOn ?? ""),
+    season: row.season ?? "",
+    saldo: null,
+    placar: "",
+    tone: "empate",
+  };
 }
 
 function skipSentence(people: { name: string }[]) {
@@ -222,7 +252,13 @@ function ProfessorsRoster() {
       {ready && !order.length && !error ? <Muted>Nenhum mensalista na ordem.</Muted> : null}
       {order.length ? (
         <Scroll>
-          <SectionTitle>Jogos</SectionTitle>
+          <ShareRow>
+            <SectionTitle>Jogos</SectionTitle>
+            <ShareImageButton
+              disabled={!rows.length}
+              onShare={() => shareProfessorsImage(selected?.name ?? "Temporada", rows.map(professorImageRow))}
+            />
+          </ShareRow>
           <Grid>
             <Head>
               <span>Professor</span>
@@ -340,6 +376,15 @@ function ProfessorsRoster() {
     </Stack>
   );
 }
+
+const ShareRow = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 8px 0 14px;
+`;
 
 const Scroll = styled.div`
   width: 100%;

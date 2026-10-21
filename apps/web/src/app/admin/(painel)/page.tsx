@@ -31,7 +31,7 @@ export default async function AdminHome() {
         <Stat><b>{leader ? leader.points : 0}</b><span>Pontos do líder</span></Stat>
         <Stat><b>{recent.length ? formatShortDate(recent[0].playedOn) : "—"}</b><span>Último jogo</span></Stat>
       </StatGrid>
-      <SummaryTabs rows={table.rows} goals={goals} assists={assists} matches={recent} />
+      <SummaryTabs rows={table.rows} goals={goals} assists={assists} matches={recent} seasonName={table.season.name} />
     </Stack>
   );
 }

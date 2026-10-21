@@ -1,7 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { ShareImageButton } from "@/components/ShareImageButton";
 import { formatDiff, formatPercent, formatShortDate } from "@/lib/format";
+import { shareStandingsImage } from "@/lib/table-image";
 import { Empty, Guest, Muted, NameLink, RankRow, Search, Table, TableWrap, Td, Th, Toolbar } from "@/styles/ui";
 import type { StandingRow } from "@/lib/types";
 
@@ -11,7 +13,7 @@ function rankedRows(rows: StandingRow[]) {
   return kept.map((row, index) => ({ ...row, position: index + 1 }));
 }
 
-export function StandingsTable({ rows }: { rows: StandingRow[] }) {
+export function StandingsTable({ rows, seasonName = "Temporada" }: { rows: StandingRow[]; seasonName?: string }) {
   const [query, setQuery] = useState("");
   const standing = useMemo(() => rankedRows(rows), [rows]);
   const visible = useMemo(() => {
@@ -25,6 +27,7 @@ export function StandingsTable({ rows }: { rows: StandingRow[] }) {
       <Toolbar>
         <Search placeholder="Buscar jogador" value={query} onChange={(event) => setQuery(event.target.value)} />
         <Muted>{visible.length} jogadores</Muted>
+        <ShareImageButton disabled={!standing.length} onShare={() => shareStandingsImage(seasonName, standing)} />
       </Toolbar>
       <TableWrap>
         <Table>

@@ -43,7 +43,19 @@ function Ranking({ rows, label }: { rows: ScorerRow[]; label: "Gols" | "Assistê
   );
 }
 
-export function SummaryTabs({ rows, goals, assists, matches }: { rows: StandingRow[]; goals: ScorerRow[]; assists: ScorerRow[]; matches: MatchDetail[] }) {
+export function SummaryTabs({
+  rows,
+  goals,
+  assists,
+  matches,
+  seasonName,
+}: {
+  rows: StandingRow[];
+  goals: ScorerRow[];
+  assists: ScorerRow[];
+  matches: MatchDetail[];
+  seasonName?: string;
+}) {
   const [tab, setTab] = useState<Tab>("classificacao");
 
   return (
@@ -59,7 +71,7 @@ export function SummaryTabs({ rows, goals, assists, matches }: { rows: StandingR
         })}
       </Actions>
       <div>
-        {tab === "classificacao" ? <StandingsTable rows={rows} /> : null}
+        {tab === "classificacao" ? <StandingsTable rows={rows} seasonName={seasonName} /> : null}
         {tab === "artilharia" ? <Ranking rows={goals} label="Gols" /> : null}
         {tab === "assistencias" ? <Ranking rows={assists} label="Assistências" /> : null}
         {tab === "jogos" ? (

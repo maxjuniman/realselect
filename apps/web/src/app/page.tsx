@@ -21,7 +21,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             <SeasonSelect seasons={seasons} value={table.season.code} path="/" />
           </PanelHead>
           <Rules>Critérios de desempate: mais jogos, saldo de gols e vitória mais recente.</Rules>
-          <StandingsTable rows={table.rows} />
+          <StandingsTable rows={table.rows} seasonName={table.season.name} />
         </Panel>
       </>
     );

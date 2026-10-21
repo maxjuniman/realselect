@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import styled from "styled-components";
+import { ShareImageButton } from "@/components/ShareImageButton";
 import { formatShortDate, resultLabel } from "@/lib/format";
 import { historyHref, seasonBands, type HistoryColumn, type HistoryRow } from "@/lib/history";
+import { shareHistoryImage } from "@/lib/table-image";
 import type { Season } from "@/lib/types";
 import { Empty, PanelHead, Rules, SectionTitle, Select } from "@/styles/ui";
 
@@ -214,6 +216,10 @@ export function HistoryBoard({
 }) {
   const router = useRouter();
   const bands = seasonBands(columns);
+  const imageTitle = [primary, ...extras]
+    .map((code) => seasons.find((season) => season.code === code)?.name)
+    .filter((name): name is string => Boolean(name))
+    .join(" + ");
   const bandOf = new Map<string, number>();
   bands.forEach((band, index) => bandOf.set(band.code, index % 2));
   const several = bands.length > 1;
@@ -259,6 +265,7 @@ export function HistoryBoard({
         </SeasonList>
       </Filters>
       <Rules>Cada casa é a pontuação da terça. A soma fica na última coluna.</Rules>
+      <ShareImageButton disabled={!rows.length || !columns.length} onShare={() => shareHistoryImage(imageTitle || "Temporadas", columns, rows)} />
       <Legend>
         <li>
           <Swatch $tone="win" />3 vitória
