@@ -1,4 +1,5 @@
 import { formatLongDate } from "./format";
+import { drawBanner, loadLogo } from "./share-image";
 
 type LineupPlayer = { name: string };
 
@@ -6,7 +7,6 @@ const width = 1080;
 const ink = "#1c1022";
 const paper = "#f7f4f6";
 const purple = "#4c124f";
-const green = "#008000";
 
 export async function shareLineupImage(input: {
   playedOn: string;
@@ -31,31 +31,20 @@ export async function shareLineupImage(input: {
 
 async function drawLineup(input: { playedOn: string; teamA: LineupPlayer[]; teamB: LineupPlayer[] }) {
   const rows = Math.max(input.teamA.length, input.teamB.length, 1);
-  const height = 280 + rows * 54 + 72;
+  const height = 250 + rows * 54 + 36;
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Não foi possível gerar a imagem.");
+  const logo = await loadLogo();
 
   ctx.fillStyle = paper;
   ctx.fillRect(0, 0, width, height);
-  ctx.fillStyle = purple;
-  ctx.fillRect(0, 0, width, 168);
-
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "700 64px Segoe UI, sans-serif";
-  ctx.fillText("Real Select", 64, 86);
-  ctx.fillStyle = green;
-  ctx.font = "600 32px Segoe UI, sans-serif";
-  ctx.fillText(formatLongDate(input.playedOn), 64, 136);
+  drawBanner(ctx, width, "Real Select", formatLongDate(input.playedOn), logo);
 
   drawColumn(ctx, "Time A", input.teamA, 64, ink);
   drawColumn(ctx, "Time B", input.teamB, 560, purple);
-
-  ctx.fillStyle = "#5e4d63";
-  ctx.font = "500 24px Segoe UI, sans-serif";
-  ctx.fillText("Futibas de terça", 64, height - 36);
 
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
   if (!blob) throw new Error("Não foi possível gerar a imagem.");

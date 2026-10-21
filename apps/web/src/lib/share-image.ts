@@ -46,23 +46,55 @@ export function paintSheet(width: number, height: number, draw: (ctx: CanvasRend
   });
 }
 
-export function drawBanner(ctx: CanvasRenderingContext2D, width: number, title: string, subtitle: string) {
+let logoTask: Promise<CanvasImageSource | null> | null = null;
+
+export function loadLogo() {
+  if (typeof Image === "undefined") return Promise.resolve(null);
+  if (!logoTask) {
+    logoTask = new Promise((resolve) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => resolve(null);
+      image.src = "/brand/logo.png";
+    });
+  }
+  return logoTask;
+}
+
+export function drawBanner(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  title: string,
+  subtitle: string,
+  logo: CanvasImageSource | null,
+  progress?: string,
+) {
   ctx.fillStyle = purple;
   ctx.fillRect(0, 0, width, 156);
+  const logoSize = 116;
+  const reserved = logo ? logoSize + 36 : 0;
+  if (logo) ctx.drawImage(logo, width - 20 - logoSize, 20, logoSize, logoSize);
+  const max = width - 80 - reserved;
   ctx.fillStyle = "#ffffff";
   ctx.font = "700 52px Segoe UI, sans-serif";
   ctx.textBaseline = "alphabetic";
-  ctx.fillText(fitText(ctx, title, width - 80), 40, 72);
-  ctx.fillStyle = green;
+  ctx.fillText(fitText(ctx, title, max), 40, 72);
   ctx.font = "600 28px Segoe UI, sans-serif";
-  ctx.fillText(fitText(ctx, subtitle, width - 80), 40, 118);
-}
-
-export function drawFooter(ctx: CanvasRenderingContext2D, height: number) {
-  ctx.fillStyle = muted;
-  ctx.font = "500 22px Segoe UI, sans-serif";
-  ctx.textBaseline = "alphabetic";
-  ctx.fillText("Futibas de terça", 40, height - 24);
+  let progressWidth = 0;
+  if (progress) {
+    ctx.font = "700 28px Segoe UI, sans-serif";
+    progressWidth = ctx.measureText(progress).width;
+    ctx.font = "600 28px Segoe UI, sans-serif";
+  }
+  const gap = progress ? 28 : 0;
+  const name = fitText(ctx, subtitle, Math.max(40, max - progressWidth - gap));
+  const nameWidth = ctx.measureText(name).width;
+  ctx.fillStyle = green;
+  ctx.fillText(name, 40, 118);
+  if (!progress) return;
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "700 28px Segoe UI, sans-serif";
+  ctx.fillText(progress, 40 + nameWidth + gap, 118);
 }
 
 export function fitText(ctx: CanvasRenderingContext2D, text: string, max: number) {

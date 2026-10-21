@@ -13,7 +13,17 @@ function rankedRows(rows: StandingRow[]) {
   return kept.map((row, index) => ({ ...row, position: index + 1 }));
 }
 
-export function StandingsTable({ rows, seasonName = "Temporada", share = false }: { rows: StandingRow[]; seasonName?: string; share?: boolean }) {
+export function StandingsTable({
+  rows,
+  seasonName = "Temporada",
+  share = false,
+  games,
+}: {
+  rows: StandingRow[];
+  seasonName?: string;
+  share?: boolean;
+  games?: { played: number; total: number };
+}) {
   const [query, setQuery] = useState("");
   const standing = useMemo(() => rankedRows(rows), [rows]);
   const visible = useMemo(() => {
@@ -28,7 +38,7 @@ export function StandingsTable({ rows, seasonName = "Temporada", share = false }
         <Search placeholder="Buscar jogador" value={query} onChange={(event) => setQuery(event.target.value)} />
         <Muted>{visible.length} jogadores</Muted>
         {share ? (
-          <ShareImageButton disabled={!standing.length} filename="classificacao-real-select.png" onImage={() => standingsImage(seasonName, standing)} />
+          <ShareImageButton disabled={!standing.length} filename="classificacao-real-select.png" onImage={() => standingsImage(seasonName, standing, games)} />
         ) : null}
       </Toolbar>
       <TableWrap>

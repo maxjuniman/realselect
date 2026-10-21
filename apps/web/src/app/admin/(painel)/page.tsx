@@ -1,7 +1,7 @@
 import { AdminShortcut } from "@/components/AdminShortcut";
 import { SummaryTabs } from "@/components/SummaryTabs";
 import { loadMatches, loadScorers, loadStandings } from "@/lib/api";
-import { formatShortDate } from "@/lib/format";
+import { formatShortDate, semesterTuesdays } from "@/lib/format";
 import type { ScorerRow } from "@/lib/types";
 import { PageTitle, PanelHead, Stack, Stat, StatGrid } from "@/styles/ui";
 
@@ -31,7 +31,14 @@ export default async function AdminHome() {
         <Stat><b>{leader ? leader.points : 0}</b><span>Pontos do líder</span></Stat>
         <Stat><b>{recent.length ? formatShortDate(recent[0].playedOn) : "—"}</b><span>Último jogo</span></Stat>
       </StatGrid>
-      <SummaryTabs rows={table.rows} goals={goals} assists={assists} matches={recent} seasonName={table.season.name} />
+      <SummaryTabs
+        rows={table.rows}
+        goals={goals}
+        assists={assists}
+        matches={recent}
+        seasonName={table.season.name}
+        games={{ played: matches.filter((match) => !match.scheduled).length, total: semesterTuesdays(table.season.year, table.season.half) }}
+      />
     </Stack>
   );
 }

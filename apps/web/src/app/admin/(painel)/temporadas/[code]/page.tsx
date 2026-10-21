@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { StandingsTable } from "@/components/StandingsTable";
 import { clientApi } from "@/lib/client";
-import { formatLongDate } from "@/lib/format";
+import { formatLongDate, semesterTuesdays } from "@/lib/format";
 import type { MatchDetail, ScorerRow, Season, Standings } from "@/lib/types";
 import {
   Actions,
@@ -85,7 +85,14 @@ export default function SeasonDataPage() {
         })}
       </Actions>
 
-      {view === "classificacao" && table ? <StandingsTable rows={table.rows} seasonName={table.season.name} share /> : null}
+      {view === "classificacao" && table ? (
+        <StandingsTable
+          rows={table.rows}
+          seasonName={table.season.name}
+          share
+          games={{ played: matches.filter((match) => !match.scheduled).length, total: semesterTuesdays(table.season.year, table.season.half) }}
+        />
+      ) : null}
 
       {view === "artilharia" && scorers ? (
         <Panel>

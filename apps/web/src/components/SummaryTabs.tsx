@@ -49,12 +49,14 @@ export function SummaryTabs({
   assists,
   matches,
   seasonName,
+  games,
 }: {
   rows: StandingRow[];
   goals: ScorerRow[];
   assists: ScorerRow[];
   matches: MatchDetail[];
   seasonName?: string;
+  games?: { played: number; total: number };
 }) {
   const [tab, setTab] = useState<Tab>("classificacao");
 
@@ -71,7 +73,7 @@ export function SummaryTabs({
         })}
       </Actions>
       <div>
-        {tab === "classificacao" ? <StandingsTable rows={rows} seasonName={seasonName} share /> : null}
+        {tab === "classificacao" ? <StandingsTable rows={rows} seasonName={seasonName} share games={games} /> : null}
         {tab === "artilharia" ? <Ranking rows={goals} label="Gols" /> : null}
         {tab === "assistencias" ? <Ranking rows={assists} label="Assistências" /> : null}
         {tab === "jogos" ? (

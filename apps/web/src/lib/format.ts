@@ -51,3 +51,17 @@ export function seasonCodeFromDate(iso: string) {
   const [year, month] = iso.split("-").map(Number);
   return `0${month <= 6 ? 1 : 2}_${year}`;
 }
+
+export function semesterTuesdays(year: number, half: number) {
+  if (!year || (half !== 1 && half !== 2)) return 0;
+  const start = new Date(Date.UTC(year, half === 1 ? 0 : 6, 1));
+  const end = new Date(Date.UTC(year, half === 1 ? 6 : 12, 0));
+  const cursor = new Date(start);
+  cursor.setUTCDate(1 + ((2 - start.getUTCDay() + 7) % 7));
+  let count = 0;
+  while (cursor <= end) {
+    count += 1;
+    cursor.setUTCDate(cursor.getUTCDate() + 7);
+  }
+  return count;
+}

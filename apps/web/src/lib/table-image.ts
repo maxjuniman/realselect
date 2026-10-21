@@ -1,10 +1,10 @@
 import { formatDiff, formatPercent, formatShortDate } from "./format";
 import { seasonBands, type HistoryColumn, type HistoryRow } from "./history";
-import { drawBanner, drawFooter, fitText, paintSheet, sheet } from "./share-image";
+import { drawBanner, fitText, loadLogo, paintSheet, sheet } from "./share-image";
 import type { StandingRow } from "./types";
 
-export function standingsImage(seasonName: string, rows: StandingRow[]) {
-  return drawStandings(seasonName, rows);
+export function standingsImage(seasonName: string, rows: StandingRow[], games?: { played: number; total: number }) {
+  return drawStandings(seasonName, rows, games);
 }
 
 export function professorsImage(seasonName: string, rows: ProfessorImageRow[]) {
@@ -26,15 +26,17 @@ export type ProfessorImageRow = {
 
 const ranks = ["", "#008000", "#8e95a3", "#a56a34"];
 
-async function drawStandings(seasonName: string, rows: StandingRow[]) {
+async function drawStandings(seasonName: string, rows: StandingRow[], games?: { played: number; total: number }) {
+  const logo = await loadLogo();
+  const progress = games && games.total > 0 ? `${games.played}/${games.total}` : undefined;
   const width = 1080;
   const rowH = 48;
   const head = 168;
-  const height = head + 52 + rows.length * rowH + 64;
+  const height = head + 52 + rows.length * rowH + 28;
   const columns = [52, 292, 70, 70, 70, 70, 70, 78, 108, 160];
   const labels = ["#", "Jogador", "P", "J", "V", "E", "D", "SG", "Aprov.", "Última vitória"];
   return paintSheet(width, height, (ctx) => {
-    drawBanner(ctx, width, "Classificação", seasonName);
+    drawBanner(ctx, width, "Classificação", seasonName, logo, progress);
     let x = 40;
     ctx.font = "700 18px Segoe UI, sans-serif";
     ctx.fillStyle = sheet.ink;
@@ -75,19 +77,19 @@ async function drawStandings(seasonName: string, rows: StandingRow[]) {
       });
     });
     ctx.textAlign = "left";
-    drawFooter(ctx, height);
   });
 }
 
 async function drawProfessors(seasonName: string, rows: ProfessorImageRow[]) {
+  const logo = await loadLogo();
   const width = 1080;
   const rowH = 52;
   const head = 168;
-  const height = head + 52 + Math.max(rows.length, 1) * rowH + 64;
+  const height = head + 52 + Math.max(rows.length, 1) * rowH + 28;
   const columns = [280, 180, 180, 140, 220];
   const labels = ["Professor", "Data", "Semestre", "Saldo", "Placar"];
   return paintSheet(width, height, (ctx) => {
-    drawBanner(ctx, width, "Professores", seasonName);
+    drawBanner(ctx, width, "Professores", seasonName, logo);
     let x = 40;
     ctx.font = "700 18px Segoe UI, sans-serif";
     ctx.fillStyle = sheet.ink;
@@ -117,11 +119,11 @@ async function drawProfessors(seasonName: string, rows: ProfessorImageRow[]) {
         cell += columns[column];
       });
     });
-    drawFooter(ctx, height);
   });
 }
 
 async function drawHistory(title: string, columns: HistoryColumn[], rows: HistoryRow[]) {
+  const logo = await loadLogo();
   const nameW = 220;
   const cellW = 42;
   const ptsW = 64;
@@ -133,14 +135,14 @@ async function drawHistory(title: string, columns: HistoryColumn[], rows: Histor
   const head = 156;
   const legend = 48;
   const width = Math.max(1080, pad * 2 + nameW + columns.length * cellW + ptsW);
-  const height = head + legend + bandH + dateH + rows.length * rowH + 64;
+  const height = head + legend + bandH + dateH + rows.length * rowH + 28;
   const colors = {
     win: { fill: "#c9efd6", ink: "#14663a" },
     loss: { fill: "#f8cfd6", ink: "#9d2438" },
     draw: { fill: "#ffe59a", ink: "#6d5308" },
   };
   return paintSheet(width, height, (ctx) => {
-    drawBanner(ctx, width, "Histórico", title);
+    drawBanner(ctx, width, "Histórico", title, logo);
     const legendY = head + 24;
     const items = [
       { fill: colors.win.fill, label: "3 vitória" },
@@ -233,6 +235,5 @@ async function drawHistory(title: string, columns: HistoryColumn[], rows: Histor
       ctx.fillText(String(row.points), pad + nameW + columns.length * cellW + ptsW / 2, y + rowH / 2);
     });
     ctx.textAlign = "left";
-    drawFooter(ctx, height);
   });
 }
