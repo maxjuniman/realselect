@@ -1,1 +1,1 @@
-0 17 * * 1 /usr/local/bin/cron-lista
+0 17 * * 4 /usr/local/bin/cron-lista
