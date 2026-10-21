@@ -13,7 +13,7 @@ export type ParsedTeams =
     }
   | { ok: false; message: string };
 
-const header = /^(verde|roxo)\s*:?\s*(\d{1,2})$/i;
+const header = /^(verde|roxo)(?:\s*:?\s*\d{1,2})?$/i;
 
 function fold(value: string) {
   return value
@@ -35,20 +35,20 @@ function resolve(token: string, players: PlayerRef[]) {
   return { problem: token };
 }
 
-export function parseTeamList(text: string, players: PlayerRef[]): ParsedTeams {
+export function parseTeamList(text: string, players: PlayerRef[], scores: { verde: number; roxo: number }): ParsedTeams {
   const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   if (!lines.length) return { ok: false, message: "Cole a lista dos times." };
 
-  const blocks: { color: TeamColor; score: number; names: string[] }[] = [];
+  const blocks: { color: TeamColor; names: string[] }[] = [];
   let current: (typeof blocks)[number] | null = null;
   for (const line of lines) {
     const match = line.match(header);
     if (match) {
-      current = { color: match[1].toLocaleLowerCase("pt-BR") as TeamColor, score: Number(match[2]), names: [] };
+      current = { color: match[1].toLocaleLowerCase("pt-BR") as TeamColor, names: [] };
       blocks.push(current);
       continue;
     }
-    if (!current) return { ok: false, message: "Comece cada time com a cor e o placar, como VERDE 8." };
+    if (!current) return { ok: false, message: "Comece cada time com a cor, como VERDE." };
     current.names.push(line);
   }
 
@@ -85,8 +85,8 @@ export function parseTeamList(text: string, players: PlayerRef[]): ParsedTeams {
   return {
     ok: true,
     colorA: blocks[0].color,
-    scoreA: blocks[0].score,
-    scoreB: blocks[1].score,
+    scoreA: scores[blocks[0].color],
+    scoreB: scores[blocks[1].color],
     teamA: teams[0],
     teamB: teams[1],
   };

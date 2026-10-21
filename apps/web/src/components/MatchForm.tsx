@@ -58,7 +58,10 @@ export function MatchForm({
   const [query, setQuery] = useState("");
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
+  const [listOpen, setListOpen] = useState(false);
   const [listText, setListText] = useState("");
+  const [verdeScore, setVerdeScore] = useState("");
+  const [roxoScore, setRoxoScore] = useState("");
   const [listError, setListError] = useState("");
   const [fromList, setFromList] = useState(false);
   const [sides, setSides] = useState<Record<string, Side>>(() => {
@@ -106,7 +109,15 @@ export function MatchForm({
   }
 
   function applyList() {
-    const parsed = parseTeamList(listText, players);
+    const verdeText = verdeScore.trim();
+    const roxoText = roxoScore.trim();
+    const verde = Number(verdeText);
+    const roxo = Number(roxoText);
+    if (!/^\d{1,2}$/.test(verdeText) || !/^\d{1,2}$/.test(roxoText) || verde > 99 || roxo > 99) {
+      setListError("Informe o placar do verde e do roxo.");
+      return;
+    }
+    const parsed = parseTeamList(listText, players, { verde, roxo });
     if (!parsed.ok) {
       setListError(parsed.message);
       return;
@@ -121,6 +132,7 @@ export function MatchForm({
     setKeepDiff(false);
     setFromList(true);
     setListError("");
+    setListOpen(false);
   }
 
   function askSave() {
@@ -197,22 +209,43 @@ export function MatchForm({
   return (
     <Stack>
       {!initial ? (
-        <Paste>
-          <Field>
-            Lista dos times
+        <GhostButton type="button" onClick={() => setListOpen(true)}>
+          Lista dos times
+        </GhostButton>
+      ) : null}
+      {listOpen ? (
+        <Backdrop onMouseDown={() => setListOpen(false)}>
+          <ListDialog role="dialog" aria-modal="true" aria-labelledby="team-list-title" onMouseDown={(event) => event.stopPropagation()}>
+            <ListHead>
+              <h2 id="team-list-title">Lista dos times</h2>
+              <GhostButton type="button" onClick={() => setListOpen(false)}>
+                Fechar
+              </GhostButton>
+            </ListHead>
+            <ScoreRow>
+              <ScoreBox>
+                Verde
+                <input type="number" min={0} max={99} value={verdeScore} onChange={(event) => setVerdeScore(event.target.value)} />
+              </ScoreBox>
+              <Times>x</Times>
+              <ScoreBox>
+                Roxo
+                <input type="number" min={0} max={99} value={roxoScore} onChange={(event) => setRoxoScore(event.target.value)} />
+              </ScoreBox>
+            </ScoreRow>
             <ListInput
+              aria-label="Nomes dos times"
               value={listText}
               rows={12}
-              placeholder={"VERDE 8\nMarciano\n\nROXO 3\nEdy"}
+              placeholder={"VERDE\nMarciano\n\nROXO\nEdy"}
               onChange={(event) => setListText(event.target.value)}
             />
-          </Field>
-          <Muted>Cole as cores e o placar. O sistema separa os times para você conferir antes de salvar.</Muted>
-          {listError ? <ErrorText>{listError}</ErrorText> : null}
-          <GhostButton type="button" onClick={applyList}>
-            Separar times
-          </GhostButton>
-        </Paste>
+            {listError ? <ErrorText>{listError}</ErrorText> : null}
+            <PrimaryButton type="button" onClick={applyList}>
+              Separar times
+            </PrimaryButton>
+          </ListDialog>
+        </Backdrop>
       ) : null}
       {!scoring ? (
         <Field>
@@ -451,11 +484,31 @@ function TeamBucket({
   );
 }
 
-const Paste = styled.div`
+const ListDialog = styled.div`
+  width: min(560px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  background: ${({ theme }) => theme.paper};
+  padding: 22px;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 10px;
+  gap: 14px;
+  h2 {
+    margin: 0;
+    font-family: ${({ theme }) => theme.display};
+    font-stretch: 87.5%;
+    font-weight: 700;
+    font-size: 36px;
+    letter-spacing: -0.03em;
+    line-height: 0.95;
+  }
+`;
+
+const ListHead = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
 `;
 
 const ListInput = styled.textarea`
