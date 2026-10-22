@@ -34,9 +34,6 @@ export async function loginPlayer(name: string, password: string) {
   if (account.access === "pending") return { error: "Seu cadastro ainda espera a aprovação do organizador." };
   if (account.access !== "approved" || !account.player) return { error: "O organizador não liberou esse acesso." };
   const player = account.player;
-  if (!player.active || player.guest || player.squad !== "mensalista" || player.name === "Gol contra") {
-    return { error: "O organizador não liberou esse acesso." };
-  }
   const token = jwt.sign({ sub: account.id, role: "player" }, secret(), { expiresIn: "30d" });
   return { token, player: { id: player.id, name: player.name } };
 }
@@ -80,7 +77,7 @@ export async function requireSession(request: FastifyRequest, reply: FastifyRepl
     if (payload.role === "player") {
       const account = await prisma.playerAccount.findUnique({ where: { id: payload.sub }, include: { player: true } });
       const player = account?.player;
-      if (!account || account.access !== "approved" || !player || !player.active || player.guest || player.squad !== "mensalista" || player.name === "Gol contra") {
+      if (!account || account.access !== "approved" || !player) {
         reply.code(401).send({ message: "Sessão inválida." });
         return null;
       }
