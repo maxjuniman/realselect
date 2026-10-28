@@ -96,7 +96,9 @@ export function MatchForm({
   const teamA = players.filter((player) => sides[player.id] === "A");
   const teamB = players.filter((player) => sides[player.id] === "B");
   const playing = [...teamA, ...teamB];
-  const professors = playing.filter(isMensalista);
+  const professors = players
+    .filter(isMensalista)
+    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
   const assigned = players.find((player) => player.id === professorId);
   const professorOptions = assigned && !professors.some((player) => player.id === assigned.id) ? [...professors, assigned] : professors;
   const tuesday = new Date(`${playedOn}T12:00:00`).getUTCDay() === 2;
@@ -120,7 +122,8 @@ export function MatchForm({
       setListError("Informe o placar do verde e do roxo.");
       return;
     }
-    const parsed = parseTeamList(listText, players, { verde, roxo });
+    const activePlayers = players.filter((player) => player.active !== false);
+    const parsed = parseTeamList(listText, activePlayers, { verde, roxo });
     if (!parsed.ok) {
       setListError(parsed.message);
       return;
@@ -213,14 +216,14 @@ export function MatchForm({
     <Stack>
       {!initial ? (
         <GhostButton type="button" onClick={() => setListOpen(true)}>
-          Lista dos times
+          Importar times
         </GhostButton>
       ) : null}
       {listOpen ? (
         <Backdrop onMouseDown={() => setListOpen(false)}>
           <ListDialog role="dialog" aria-modal="true" aria-labelledby="team-list-title" onMouseDown={(event) => event.stopPropagation()}>
             <ListHead>
-              <h2 id="team-list-title">Lista dos times</h2>
+              <h2 id="team-list-title">Importar times</h2>
               <GhostButton type="button" onClick={() => setListOpen(false)}>
                 Fechar
               </GhostButton>
@@ -352,10 +355,7 @@ export function MatchForm({
         Professor da rodada
         <Select value={professorId} onChange={(event) => setProfessorId(event.target.value)}>
           <option value="">Sem professor</option>
-          {professorOptions
-            .slice()
-            .sort(byPosition)
-            .map((player) => (
+          {professorOptions.map((player) => (
               <option key={player.id} value={player.id}>
                 {player.name}
               </option>
