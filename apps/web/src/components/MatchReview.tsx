@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { MatchAwards } from "@/components/MatchAwards";
+import { awardsOpen } from "@/lib/awards";
 import { shareLineupImage } from "@/lib/lineup-image";
 import { formatLongDate } from "@/lib/format";
 import type { LinePlayer, MatchDetail } from "@/lib/types";
@@ -43,6 +45,7 @@ export function MatchReview({ match }: { match: MatchDetail }) {
         <Team title="Time A" tone="a" players={match.teamA} />
         <Team title="Time B" tone="b" players={match.teamB} />
       </Lineup>
+      {awardsOpen(match) ? <MatchAwards matchId={match.id} playedOn={match.playedOn} players={[...match.teamA, ...match.teamB]} /> : null}
       {error ? <ErrorText>{error}</ErrorText> : null}
       {note ? <Muted>{note}</Muted> : null}
       <Actions>

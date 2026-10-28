@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import styled from "styled-components";
+import { MatchAwards } from "@/components/MatchAwards";
+import { awardsOpen } from "@/lib/awards";
 import { formatLongDate, formatTinyDate } from "@/lib/format";
 import { placar, winnerTone } from "@/lib/score";
 import type { LinePlayer, MatchDetail } from "@/lib/types";
@@ -56,6 +58,7 @@ export function MatchBrowse({ matches, basePath }: { matches: MatchDetail[]; bas
                 )}
               </Detail>
             ) : null}
+            {awardsOpen(match) ? <MatchAwards matchId={match.id} playedOn={match.playedOn} players={players} /> : null}
           </Item>
         );
       })}

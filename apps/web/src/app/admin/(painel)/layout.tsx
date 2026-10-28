@@ -22,6 +22,7 @@ const adminLinks = [
 
 const playerLinks = [
   { href: "/admin", label: "Resumo" },
+  { href: "/jogos", label: "Jogos" },
   { href: "/admin/jogadores", label: "Jogadores" },
 ];
 

@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
-import { createUser, hashPassword, login, loginPlayer, requireSession, requireUser } from "../lib/auth.js";
+import { createUser, hashPassword, login, loginPlayer, readSession, requireSession, requireUser } from "../lib/auth.js";
 import { dateToIso, isoToDate, seasonFromCode } from "../lib/dates.js";
 import { matchInclude, matchInputSchema, presentMatch, saveMatch } from "../lib/matches.js";
 import { removePhoto, savePhoto } from "../lib/photos.js";
@@ -9,6 +9,7 @@ import { prisma } from "../lib/prisma.js";
 import { professorRoster, saveAbsences, saveProfessorOrder, saveProfessorPlans } from "../lib/professors.js";
 import { sendTelegramText } from "../lib/telegram-lista.js";
 import { POSITIONS, SQUADS, cleanPositions } from "../lib/roster.js";
+import { awardsFor, saveVote } from "../lib/votes.js";
 
 const photoField = z.string().max(1_800_000).nullable().optional();
 const birthField = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional();
@@ -412,6 +413,26 @@ export async function adminRoutes(app: FastifyInstance) {
     if (!saved.ok) return reply.code(saved.status).send({ message: saved.error });
     const match = await prisma.match.findUniqueOrThrow({ where: { id: saved.match.id }, include: matchInclude });
     return presentMatch(match);
+  });
+
+  app.get<{ Params: { id: string } }>("/matches/:id/votes", async (request, reply) => {
+    const session = await readSession(request);
+    const viewer = session?.role === "player" ? { role: "player" as const, playerId: session.player.id } : session?.role === "admin" ? { role: "admin" as const } : null;
+    const awards = await awardsFor(request.params.id, viewer);
+    if (!awards) return reply.code(404).send({ message: "Jogo não encontrado." });
+    return awards;
+  });
+
+  app.put<{ Params: { id: string } }>("/matches/:id/votes", async (request, reply) => {
+    const session = await requireSession(request, reply);
+    if (!session) return;
+    if (session.role !== "player") return reply.code(403).send({ message: "Só o jogador vota no craque e na pereba." });
+    const body = z.object({ craqueId: z.string().min(1), perebaId: z.string().min(1) }).safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ message: "Escolha o craque e a pereba." });
+    const saved = await saveVote(request.params.id, session.player.id, body.data.craqueId, body.data.perebaId);
+    if (!saved.ok) return reply.code(saved.status).send({ message: saved.error });
+    const awards = await awardsFor(request.params.id, { role: "player", playerId: session.player.id });
+    return awards;
   });
 
   app.delete<{ Params: { id: string } }>("/admin/matches/:id", async (request, reply) => {

@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
+import { MatchAwards } from "@/components/MatchAwards";
 import { ApiError, api } from "@/lib/api";
+import { awardsOpen } from "@/lib/awards";
 import { formatDiff, formatLongDate, resultLabel } from "@/lib/format";
 import { Kicker, Lineup, Muted, NameLink, PageBlock, PageTitle, Pill, PlayerLine, Scoreline, SideCard } from "@/styles/ui";
 import type { LinePlayer, MatchDetail } from "@/lib/types";
@@ -50,6 +52,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
         <Team title="Time A" tone="a" players={match.teamA} />
         <Team title="Time B" tone="b" players={match.teamB} />
       </Lineup>
+      {awardsOpen(match) ? <MatchAwards matchId={match.id} playedOn={match.playedOn} players={[...match.teamA, ...match.teamB]} /> : null}
     </PageBlock>
   );
 }

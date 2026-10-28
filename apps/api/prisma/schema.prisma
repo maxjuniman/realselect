@@ -43,6 +43,9 @@ model Player {
   absences      GameAbsence[]
   professorPlans ProfessorPlan[]
   account        PlayerAccount?
+  votesCast      MatchVote[]       @relation("VoteVoter")
+  craqueVotes    MatchVote[]       @relation("VoteCraque")
+  perebaVotes    MatchVote[]       @relation("VotePereba")
   createdAt      DateTime          @default(now())
 }
 
@@ -96,6 +99,7 @@ model Match {
   colorA      String            @default("verde")
   appearances MatchAppearance[]
   events      MatchEvent[]
+  votes       MatchVote[]
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
@@ -113,6 +117,20 @@ model MatchAppearance {
 
   @@unique([matchId, playerId])
   @@index([playerId])
+}
+
+model MatchVote {
+  matchId   String
+  voterId   String
+  craqueId  String
+  perebaId  String
+  match     Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  voter     Player   @relation("VoteVoter", fields: [voterId], references: [id], onDelete: Cascade)
+  craque    Player   @relation("VoteCraque", fields: [craqueId], references: [id], onDelete: Cascade)
+  pereba    Player   @relation("VotePereba", fields: [perebaId], references: [id], onDelete: Cascade)
+  updatedAt DateTime @updatedAt
+
+  @@id([matchId, voterId])
 }
 
 model MatchEvent {

@@ -66,6 +66,25 @@ export async function requireUser(request: FastifyRequest, reply: FastifyReply) 
   }
 }
 
+export async function readSession(request: FastifyRequest) {
+  const header = request.headers.authorization;
+  if (!header?.startsWith("Bearer ")) return null;
+  try {
+    const payload = jwt.verify(header.slice(7), secret()) as { sub: string; role?: string };
+    if (payload.role === "player") {
+      const account = await prisma.playerAccount.findUnique({ where: { id: payload.sub }, include: { player: true } });
+      const player = account?.player;
+      if (!account || account.access !== "approved" || !player) return null;
+      return { role: "player" as const, player, account };
+    }
+    const user = await prisma.user.findUnique({ where: { id: payload.sub } });
+    if (!user) return null;
+    return { role: "admin" as const, user };
+  } catch {
+    return null;
+  }
+}
+
 export async function requireSession(request: FastifyRequest, reply: FastifyReply) {
   const header = request.headers.authorization;
   if (!header?.startsWith("Bearer ")) {
