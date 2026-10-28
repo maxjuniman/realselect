@@ -82,6 +82,9 @@ export async function saveMatch(input: MatchInput, matchId?: string): Promise<Sa
   if (input.professorId) {
     const professor = await prisma.player.findUnique({ where: { id: input.professorId } });
     if (!professor) return { ok: false, error: "Professor não encontrado.", status: 400 };
+    const mensalista = professor.active && professor.squad === "mensalista" && !professor.guest && professor.name !== "Gol contra";
+    const already = matchId ? (await prisma.match.findUnique({ where: { id: matchId }, select: { professorId: true } }))?.professorId === input.professorId : false;
+    if (!mensalista && !already) return { ok: false, error: "O professor precisa ser mensalista.", status: 400 };
   }
 
   const hasScore = typeof input.scoreA === "number" && typeof input.scoreB === "number";

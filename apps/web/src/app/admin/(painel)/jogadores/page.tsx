@@ -7,7 +7,11 @@ import { clientApi } from "@/lib/client";
 import { photoUrl, shrinkPhoto } from "@/lib/photo";
 import { GROUPS, POSITIONS, positionRank, type GroupId } from "@/lib/roster";
 import type { PlayerRef } from "@/lib/types";
-import { ErrorText, Field, Muted, PageTitle, PanelHead, PrimaryButton, Select, Stack, TextInput } from "@/styles/ui";
+import { ErrorText, Field, Muted, PageTitle, PanelHead, PrimaryButton, Search, Select, Stack, TextInput } from "@/styles/ui";
+
+function foldName(value: string) {
+  return value.trim().toLocaleLowerCase("pt-BR").normalize("NFD").replace(/\p{M}/gu, "");
+}
 
 function groupOf(player: PlayerRef): GroupId {
   if (!player.active) return "inativo";
@@ -52,6 +56,7 @@ export default function PlayersAdminPage() {
   });
   const [draft, setDraft] = useState<Draft | null>(null);
   const [error, setError] = useState("");
+  const [query, setQuery] = useState("");
   const photoRef = useRef<HTMLInputElement>(null);
 
   async function load() {
@@ -73,13 +78,15 @@ export default function PlayersAdminPage() {
   }, [draft]);
 
   const grouped = useMemo(() => {
+    const term = foldName(query);
     return GROUPS.map((item) => ({
       ...item,
       players: players
         .filter((player) => groupOf(player) === item.id)
+        .filter((player) => !term || foldName(player.name).includes(term) || foldName(player.nickname ?? "").includes(term))
         .sort((a, b) => positionRank(a.positions?.[0]) - positionRank(b.positions?.[0]) || a.name.localeCompare(b.name, "pt-BR")),
     }));
-  }, [players]);
+  }, [players, query]);
 
   async function save(event: FormEvent) {
     event.preventDefault();
@@ -196,15 +203,17 @@ export default function PlayersAdminPage() {
         )}
       </PanelHead>
       {error && !draft ? <ErrorText>{error}</ErrorText> : null}
+      <Search aria-label="Buscar jogador" placeholder="Buscar jogador" value={query} onChange={(event) => setQuery(event.target.value)} />
+      {query.trim() && grouped.every((item) => !item.players.length) ? <Muted>Nenhum jogador com esse nome.</Muted> : null}
       <Groups>
-        {grouped.map((item) => (
+        {grouped.filter((item) => !query.trim() || item.players.length).map((item) => (
           <Group key={item.id}>
-            <GroupButton type="button" aria-expanded={open[item.id]} onClick={() => setOpen((current) => ({ ...current, [item.id]: !current[item.id] }))}>
-              <Chevron $open={open[item.id]} />
+            <GroupButton type="button" aria-expanded={Boolean(query.trim()) || open[item.id]} onClick={() => setOpen((current) => ({ ...current, [item.id]: !current[item.id] }))}>
+              <Chevron $open={Boolean(query.trim()) || open[item.id]} />
               <GroupName>{item.label}</GroupName>
               <Count>{item.players.length}</Count>
             </GroupButton>
-            {open[item.id] ? (
+            {query.trim() || open[item.id] ? (
               item.players.length ? (
                 <List>
                   {item.players.map((player) => {

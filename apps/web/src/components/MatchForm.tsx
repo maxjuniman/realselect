@@ -96,6 +96,9 @@ export function MatchForm({
   const teamA = players.filter((player) => sides[player.id] === "A");
   const teamB = players.filter((player) => sides[player.id] === "B");
   const playing = [...teamA, ...teamB];
+  const professors = playing.filter(isMensalista);
+  const assigned = players.find((player) => player.id === professorId);
+  const professorOptions = assigned && !professors.some((player) => player.id === assigned.id) ? [...professors, assigned] : professors;
   const tuesday = new Date(`${playedOn}T12:00:00`).getUTCDay() === 2;
   const scoring = !lineupOnly || fromList;
 
@@ -349,7 +352,7 @@ export function MatchForm({
         Professor da rodada
         <Select value={professorId} onChange={(event) => setProfessorId(event.target.value)}>
           <option value="">Sem professor</option>
-          {playing
+          {professorOptions
             .slice()
             .sort(byPosition)
             .map((player) => (
@@ -407,6 +410,10 @@ type Notice =
   | { step: "confirm"; action: "save" | "delete" }
   | { step: "result"; ok: boolean; message: string; href?: string }
   | null;
+
+function isMensalista(player: PlayerRef) {
+  return player.active !== false && player.squad !== "suplente" && !player.guest;
+}
 
 function byPosition(a: PlayerRef, b: PlayerRef) {
   return positionRank(a.positions?.[0]) - positionRank(b.positions?.[0]) || a.name.localeCompare(b.name, "pt-BR");
