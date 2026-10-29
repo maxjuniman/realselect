@@ -6,7 +6,7 @@ import styled from "styled-components";
 import { awardCandidate } from "@/lib/awards";
 import { clientApi } from "@/lib/client";
 import { formatLongDate, formatTinyDate } from "@/lib/format";
-import { ErrorText, Field, GhostButton, Muted, PrimaryButton, Select } from "@/styles/ui";
+import { ErrorText, Field, GhostButton, Muted, PrimaryButton, Select, Table, Td, Th } from "@/styles/ui";
 
 type Person = { id: string; name: string };
 type Count = Person & { votes: number };
@@ -135,7 +135,7 @@ export function MatchAwards({
   return (
     <>
       <Open type="button" aria-label={`${label} no jogo ${when}`} onClick={show}>
-        {label}
+        <Star />
       </Open>
       {open ? (
         <Backdrop onMouseDown={close}>
@@ -174,17 +174,32 @@ export function MatchAwards({
             ) : null}
             {awards?.role === "guest" ? <Enter href="/admin/login">Entre para escolher o craque e a pereba.</Enter> : null}
             {awards?.role === "admin" ? (
-              <Ballots>
-                {awards.ballots?.length ? (
-                  awards.ballots.map((ballot) => (
-                    <p key={ballot.voterId}>
-                      {ballot.voter} votou em {ballot.craque} como craque e em {ballot.pereba} como pereba.
-                    </p>
-                  ))
-                ) : (
-                  <Muted>Ninguém votou ainda.</Muted>
-                )}
-              </Ballots>
+              awards.ballots?.length ? (
+                <Sheet>
+                  <Table>
+                    <thead>
+                      <tr>
+                        <Th>
+                          <VisuallyHidden>Quem votou</VisuallyHidden>
+                        </Th>
+                        <Th>Craque</Th>
+                        <Th>Pereba</Th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {awards.ballots.map((ballot) => (
+                        <tr key={ballot.voterId}>
+                          <Td $name>{ballot.voter}</Td>
+                          <Td>{ballot.craque}</Td>
+                          <Td>{ballot.pereba}</Td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </Table>
+                </Sheet>
+              ) : (
+                <Muted>Ninguém votou ainda.</Muted>
+              )
             ) : null}
             {hasVotes ? (
               <Tally>
@@ -204,17 +219,26 @@ export function MatchAwards({
   );
 }
 
+function Star() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="currentColor" d="m12 3 2.6 5.6 6.1.8-4.5 4.2 1.1 6.1L12 16.8 6.7 19.7l1.1-6.1L3.3 9.4l6.1-.8L12 3Z" />
+    </svg>
+  );
+}
+
 const Open = styled.button`
+  width: 40px;
+  height: 40px;
+  padding: 0;
   border: 0;
-  padding: 0 0 8px;
-  background: transparent;
-  color: ${({ theme }) => theme.purpleDeep};
-  font: inherit;
-  font-weight: 700;
+  display: grid;
+  place-items: center;
+  background: ${({ theme }) => theme.purple};
+  color: white;
   cursor: pointer;
   &:hover {
-    text-decoration: underline;
-    text-underline-offset: 3px;
+    background: ${({ theme }) => theme.purpleDeep};
   }
   &:focus-visible {
     outline: 2px solid ${({ theme }) => theme.purpleDeep};
@@ -233,7 +257,7 @@ const Backdrop = styled.div`
 `;
 
 const Dialog = styled.div`
-  width: min(520px, 100%);
+  width: min(640px, 100%);
   max-height: min(860px, 100%);
   overflow: auto;
   background: ${({ theme }) => theme.paper};
@@ -273,13 +297,20 @@ const Enter = styled(Link)`
   }
 `;
 
-const Ballots = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  p {
-    margin: 0;
-  }
+const Sheet = styled.div`
+  width: 100%;
+  overflow-x: auto;
+`;
+
+const VisuallyHidden = styled.span`
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 `;
 
 const Tally = styled.div`

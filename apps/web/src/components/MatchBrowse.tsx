@@ -30,13 +30,18 @@ export function MatchBrowse({ matches, basePath }: { matches: MatchDetail[]; bas
         const assists = named(players, "assists");
         return (
           <Item key={match.id}>
-            <ListLink href={`${basePath}/${match.id}`}>
-              <span>{admin ? formatTinyDate(match.playedOn) : formatLongDate(match.playedOn)}</span>
-              {admin ? <ScoreText $tone={winnerTone(match)}>{placar(match)}</ScoreText> : <strong>{match.scoreLabel}</strong>}
-              <Muted as="span">
-                {match.professor ? `Prof. ${match.professor.name}` : admin ? (match.scheduled ? "Antes do jogo" : "Sem professor") : `${match.teamA.length} x ${match.teamB.length}`}
-              </Muted>
-            </ListLink>
+            <Row>
+              <ListLink href={`${basePath}/${match.id}`}>
+                <span>{admin ? formatTinyDate(match.playedOn) : formatLongDate(match.playedOn)}</span>
+                {admin ? <ScoreText $tone={winnerTone(match)}>{placar(match)}</ScoreText> : <strong>{match.scoreLabel}</strong>}
+                <Meta as="span">
+                  {match.professor ? `Prof. ${match.professor.name}` : admin ? (match.scheduled ? "Antes do jogo" : "Sem professor") : `${match.teamA.length} x ${match.teamB.length}`}
+                </Meta>
+              </ListLink>
+              <Slot>
+                {awardsOpen(match) ? <MatchAwards matchId={match.id} playedOn={match.playedOn} players={players} ballots={admin} /> : null}
+              </Slot>
+            </Row>
             {goals || assists ?
               <Toggle type="button" aria-expanded={open} onClick={() => setOpenId(open ? null : match.id)}>
                 {open ? "Ocultar detalhes" : "Ver detalhes"}
@@ -58,7 +63,6 @@ export function MatchBrowse({ matches, basePath }: { matches: MatchDetail[]; bas
                 )}
               </Detail>
             ) : null}
-            {awardsOpen(match) ? <MatchAwards matchId={match.id} playedOn={match.playedOn} players={players} ballots={admin} /> : null}
           </Item>
         );
       })}
@@ -68,10 +72,43 @@ export function MatchBrowse({ matches, basePath }: { matches: MatchDetail[]; bas
 
 const Item = styled.article`
   border-bottom: 1px solid ${({ theme }) => theme.line};
-  padding-bottom: 10px;
-  a {
-    border-bottom: 0;
-    padding-bottom: 6px;
+`;
+
+const Row = styled.div`
+  display: grid;
+  grid-template-columns: minmax(220px, 34%) minmax(0, 1fr) 40px auto;
+  gap: 12px 16px;
+  align-items: center;
+  padding: 12px 0;
+  > a {
+    display: contents;
+  }
+  @media (max-width: 860px) {
+    grid-template-columns: minmax(0, 1fr) 40px auto;
+    > a > :first-child {
+      grid-column: 1 / -1;
+    }
+  }
+`;
+
+const Meta = styled(Muted)`
+  grid-column: 4;
+  justify-self: end;
+  text-align: right;
+  @media (max-width: 860px) {
+    grid-column: 3;
+    grid-row: 2;
+  }
+`;
+
+const Slot = styled.div`
+  grid-column: 3;
+  grid-row: 1;
+  display: grid;
+  place-items: center;
+  @media (max-width: 860px) {
+    grid-column: 2;
+    grid-row: 2;
   }
 `;
 
