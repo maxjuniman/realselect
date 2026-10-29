@@ -58,7 +58,7 @@ export function MatchBrowse({ matches, basePath }: { matches: MatchDetail[]; bas
                 )}
               </Detail>
             ) : null}
-            {awardsOpen(match) ? <MatchAwards matchId={match.id} playedOn={match.playedOn} players={players} /> : null}
+            {awardsOpen(match) ? <MatchAwards matchId={match.id} playedOn={match.playedOn} players={players} ballots={admin} /> : null}
           </Item>
         );
       })}

@@ -5,8 +5,8 @@ import { useEffect, useRef, useState } from "react";
 import styled from "styled-components";
 import { awardCandidate } from "@/lib/awards";
 import { clientApi } from "@/lib/client";
-import { formatTinyDate } from "@/lib/format";
-import { ErrorText, Field, Muted, PrimaryButton, Select } from "@/styles/ui";
+import { formatLongDate, formatTinyDate } from "@/lib/format";
+import { ErrorText, Field, GhostButton, Muted, PrimaryButton, Select } from "@/styles/ui";
 
 type Person = { id: string; name: string };
 type Count = Person & { votes: number };
@@ -23,39 +23,77 @@ function named(rows: Count[]) {
   return rows.map((row) => `${row.name} (${row.votes})`).join(", ");
 }
 
-function choices(players: Person[], current: Person | null) {
-  const list = players.filter((player) => awardCandidate(player.name));
-  if (current && !list.some((player) => player.id === current.id)) list.push(current);
-  return list.sort((left, right) => left.name.localeCompare(right.name, "pt-BR"));
+function participants(players: Person[]) {
+  const byId = new Map<string, Person>();
+  for (const player of players) {
+    if (!awardCandidate(player.name) || byId.has(player.id)) continue;
+    byId.set(player.id, player);
+  }
+  return [...byId.values()].sort((left, right) => left.name.localeCompare(right.name, "pt-BR"));
 }
 
-export function MatchAwards({ matchId, playedOn, players }: { matchId: string; playedOn: string; players: Person[] }) {
+export function MatchAwards({
+  matchId,
+  playedOn,
+  players,
+  ballots = false,
+}: {
+  matchId: string;
+  playedOn: string;
+  players: Person[];
+  ballots?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
   const [awards, setAwards] = useState<Awards | null>(null);
   const [craqueId, setCraqueId] = useState("");
   const [perebaId, setPerebaId] = useState("");
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(false);
   const craqueRef = useRef<HTMLSelectElement>(null);
   const perebaRef = useRef<HTMLSelectElement>(null);
   const when = formatTinyDate(playedOn);
+  const lineup = participants(players);
+  const titleId = `vote-${matchId}`;
 
   useEffect(() => {
-    let cancel = false;
+    if (!open) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape" && !saving) setOpen(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, saving]);
+
+  function applyMine(data: Awards) {
+    const allowed = new Set(lineup.map((player) => player.id));
+    setCraqueId(data.mine && allowed.has(data.mine.craqueId) ? data.mine.craqueId : "");
+    setPerebaId(data.mine && allowed.has(data.mine.perebaId) ? data.mine.perebaId : "");
+  }
+
+  function show() {
+    setOpen(true);
+    setError("");
+    setNote("");
+    if (awards || loading) return;
+    setLoading(true);
     clientApi<Awards>(`/matches/${matchId}/votes`)
       .then((data) => {
-        if (cancel) return;
         setAwards(data);
-        setCraqueId(data.mine?.craqueId ?? "");
-        setPerebaId(data.mine?.perebaId ?? "");
+        applyMine(data);
+        if (!data.open) setOpen(false);
       })
       .catch((caught: unknown) => {
-        if (!cancel) setError(caught instanceof Error ? caught.message : "Não foi possível carregar os votos.");
-      });
-    return () => {
-      cancel = true;
-    };
-  }, [matchId]);
+        setError(caught instanceof Error ? caught.message : "Não foi possível carregar os votos.");
+      })
+      .finally(() => setLoading(false));
+  }
+
+  function close() {
+    if (saving) return;
+    setOpen(false);
+  }
 
   async function save() {
     const nextCraque = craqueRef.current?.value || craqueId;
@@ -70,6 +108,10 @@ export function MatchAwards({ matchId, playedOn, players }: { matchId: string; p
       setError("O craque e a pereba precisam ser pessoas diferentes.");
       return;
     }
+    if (!lineup.some((player) => player.id === nextCraque) || !lineup.some((player) => player.id === nextPereba)) {
+      setError("Escolha alguém que jogou.");
+      return;
+    }
     setSaving(true);
     try {
       const data = await clientApi<Awards>(`/matches/${matchId}/votes`, {
@@ -77,8 +119,7 @@ export function MatchAwards({ matchId, playedOn, players }: { matchId: string; p
         body: JSON.stringify({ craqueId: nextCraque, perebaId: nextPereba }),
       });
       setAwards(data);
-      setCraqueId(data.mine?.craqueId ?? "");
-      setPerebaId(data.mine?.perebaId ?? "");
+      applyMine(data);
       setNote("Voto salvo.");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Não foi possível salvar o voto.");
@@ -87,92 +128,139 @@ export function MatchAwards({ matchId, playedOn, players }: { matchId: string; p
     }
   }
 
-  if (awards && !awards.open) return null;
-  const craqueOptions = choices(players, awards?.mine ? { id: awards.mine.craqueId, name: awards.mine.craque } : null);
-  const perebaOptions = choices(players, awards?.mine ? { id: awards.mine.perebaId, name: awards.mine.pereba } : null);
+  const label = ballots ? "Votos" : awards?.mine ? "Alterar voto" : "Votar";
   const hasVotes = Boolean(awards && (awards.tally.craque.length || awards.tally.pereba.length));
+  const showForm = awards?.role === "player";
 
   return (
-    <Box>
-      <b>Craque e pereba</b>
-      {!awards && !error ? <Muted>Carregando votos...</Muted> : null}
-      {awards?.role === "guest" ? <Enter href="/admin/login">Entre para escolher o craque e a pereba.</Enter> : null}
-      {awards?.role === "player" ? (
-        <Form>
-          <Field>
-            Craque do jogo
-            <Select ref={craqueRef} aria-label={`Craque do jogo ${when}`} value={craqueId} onChange={(event) => setCraqueId(event.target.value)}>
-              <option value="">Escolher</option>
-              {craqueOptions.map((player) => (
-                <option key={player.id} value={player.id}>
-                  {player.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field>
-            Pereba do jogo
-            <Select ref={perebaRef} aria-label={`Pereba do jogo ${when}`} value={perebaId} onChange={(event) => setPerebaId(event.target.value)}>
-              <option value="">Escolher</option>
-              {perebaOptions.map((player) => (
-                <option key={player.id} value={player.id}>
-                  {player.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <PrimaryButton type="button" disabled={saving || !craqueOptions.length} onClick={() => void save()}>
-            {saving ? "Salvando..." : "Salvar voto"}
-          </PrimaryButton>
-        </Form>
+    <>
+      <Open type="button" aria-label={`${label} no jogo ${when}`} onClick={show}>
+        {label}
+      </Open>
+      {open ? (
+        <Backdrop onMouseDown={close}>
+          <Dialog role="dialog" aria-modal="true" aria-labelledby={titleId} onMouseDown={(event) => event.stopPropagation()}>
+            <h2 id={titleId}>{ballots ? "Quem votou" : "Craque e pereba"}</h2>
+            <Muted>{formatLongDate(playedOn)}{ballots ? "." : ". Escolha entre quem jogou."}</Muted>
+            {loading ? <Muted>Carregando votos...</Muted> : null}
+            {showForm ? (
+              <Form>
+                <Field>
+                  Craque do jogo
+                  <Select ref={craqueRef} aria-label={`Craque do jogo ${when}`} value={craqueId} onChange={(event) => setCraqueId(event.target.value)}>
+                    <option value="">Escolher</option>
+                    {lineup.map((player) => (
+                      <option key={player.id} value={player.id}>
+                        {player.name}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <Field>
+                  Pereba do jogo
+                  <Select ref={perebaRef} aria-label={`Pereba do jogo ${when}`} value={perebaId} onChange={(event) => setPerebaId(event.target.value)}>
+                    <option value="">Escolher</option>
+                    {lineup.map((player) => (
+                      <option key={player.id} value={player.id}>
+                        {player.name}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <PrimaryButton type="button" disabled={saving || !lineup.length} onClick={() => void save()}>
+                  {saving ? "Salvando..." : "Salvar voto"}
+                </PrimaryButton>
+              </Form>
+            ) : null}
+            {awards?.role === "guest" ? <Enter href="/admin/login">Entre para escolher o craque e a pereba.</Enter> : null}
+            {awards?.role === "admin" ? (
+              <Ballots>
+                {awards.ballots?.length ? (
+                  awards.ballots.map((ballot) => (
+                    <p key={ballot.voterId}>
+                      {ballot.voter} votou em {ballot.craque} como craque e em {ballot.pereba} como pereba.
+                    </p>
+                  ))
+                ) : (
+                  <Muted>Ninguém votou ainda.</Muted>
+                )}
+              </Ballots>
+            ) : null}
+            {hasVotes ? (
+              <Tally>
+                <p>Craque: {named(awards!.tally.craque) || "ninguém"}</p>
+                <p>Pereba: {named(awards!.tally.pereba) || "ninguém"}</p>
+              </Tally>
+            ) : null}
+            {note ? <Muted>{note}</Muted> : null}
+            {error ? <ErrorText>{error}</ErrorText> : null}
+            <GhostButton type="button" onClick={close}>
+              Fechar
+            </GhostButton>
+          </Dialog>
+        </Backdrop>
       ) : null}
-      {awards?.role === "admin" ? (
-        <Ballots>
-          <b>Quem votou</b>
-          {awards.ballots?.length ? (
-            awards.ballots.map((ballot) => (
-              <p key={ballot.voterId}>
-                {ballot.voter} votou em {ballot.craque} como craque e em {ballot.pereba} como pereba.
-              </p>
-            ))
-          ) : (
-            <Muted>Ninguém votou ainda.</Muted>
-          )}
-        </Ballots>
-      ) : null}
-      {hasVotes ? (
-        <Tally>
-          <p>Craque: {named(awards!.tally.craque) || "ninguém"}</p>
-          <p>Pereba: {named(awards!.tally.pereba) || "ninguém"}</p>
-        </Tally>
-      ) : null}
-      {note ? <Muted>{note}</Muted> : null}
-      {error ? <ErrorText>{error}</ErrorText> : null}
-    </Box>
+    </>
   );
 }
 
-const Box = styled.section`
+const Open = styled.button`
+  border: 0;
+  padding: 0 0 8px;
+  background: transparent;
+  color: ${({ theme }) => theme.purpleDeep};
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  &:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.purpleDeep};
+    outline-offset: 3px;
+  }
+`;
+
+const Backdrop = styled.div`
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(28, 16, 34, 0.46);
+`;
+
+const Dialog = styled.div`
+  width: min(520px, 100%);
+  max-height: min(860px, 100%);
+  overflow: auto;
+  background: ${({ theme }) => theme.paper};
+  padding: 22px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 8px;
-  margin: 4px 0 12px;
-  padding-top: 8px;
-  border-top: 1px solid ${({ theme }) => theme.line};
-  > b {
+  gap: 14px;
+  h2 {
+    margin: 0;
+    font-family: ${({ theme }) => theme.display};
+    font-stretch: 87.5%;
     font-weight: 700;
+    font-size: 32px;
+    letter-spacing: -0.03em;
+    line-height: 0.95;
   }
 `;
 
 const Form = styled.div`
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: end;
-  width: min(720px, 100%);
-  @media (max-width: 720px) {
-    grid-template-columns: 1fr;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  select {
+    width: 100%;
   }
 `;
 
@@ -189,9 +277,6 @@ const Ballots = styled.div`
   display: flex;
   flex-direction: column;
   gap: 4px;
-  b {
-    font-weight: 700;
-  }
   p {
     margin: 0;
   }

@@ -45,7 +45,7 @@ export function MatchReview({ match }: { match: MatchDetail }) {
         <Team title="Time A" tone="a" players={match.teamA} />
         <Team title="Time B" tone="b" players={match.teamB} />
       </Lineup>
-      {awardsOpen(match) ? <MatchAwards matchId={match.id} playedOn={match.playedOn} players={[...match.teamA, ...match.teamB]} /> : null}
+      {awardsOpen(match) ? <MatchAwards matchId={match.id} playedOn={match.playedOn} players={[...match.teamA, ...match.teamB]} ballots /> : null}
       {error ? <ErrorText>{error}</ErrorText> : null}
       {note ? <Muted>{note}</Muted> : null}
       <Actions>
