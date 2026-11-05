@@ -24,6 +24,7 @@ export type PlayerRef = {
   squad?: "mensalista" | "suplente";
   injured?: boolean;
   positions?: string[];
+  shirtNumber?: number | null;
 };
 
 export type Session =

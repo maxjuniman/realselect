@@ -4,6 +4,7 @@ import cors from "@fastify/cors";
 import Fastify from "fastify";
 import { uploadPath } from "./lib/photos.js";
 import { ensureProfessorOrder } from "./lib/professors.js";
+import { applyKnownShirts } from "./lib/shirts.js";
 import { prisma } from "./lib/prisma.js";
 import { cleanPositions } from "./lib/roster.js";
 import { seedChampionship } from "./seed.js";
@@ -43,6 +44,8 @@ export async function start() {
     if (!same) await prisma.player.update({ where: { id: player.id }, data: { positions } });
   }
   await ensureProfessorOrder();
+  const shirts = await applyKnownShirts();
+  if (shirts) app.log.info({ count: shirts }, "Números de camisa aplicados.");
 
   const port = Number(process.env.PORT || 3333);
   await app.listen({ port, host: "0.0.0.0" });

@@ -9,10 +9,12 @@ import { prisma } from "../lib/prisma.js";
 import { professorRoster, saveAbsences, saveProfessorOrder, saveProfessorPlans } from "../lib/professors.js";
 import { sendTelegramText } from "../lib/telegram-lista.js";
 import { POSITIONS, SQUADS, cleanPositions } from "../lib/roster.js";
+import { shirtOwner } from "../lib/shirts.js";
 import { awardsFor, saveVote, seasonAwards } from "../lib/votes.js";
 
 const photoField = z.string().max(1_800_000).nullable().optional();
 const birthField = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional();
+const shirtField = z.number().int().min(1).max(99).nullable().optional();
 
 const playerSchema = z.object({
   name: z.string().trim().min(2).max(60),
@@ -24,6 +26,7 @@ const playerSchema = z.object({
   squad: z.enum(SQUADS).optional(),
   injured: z.boolean().optional(),
   positions: z.array(z.enum(POSITIONS)).max(2).optional(),
+  shirtNumber: shirtField,
 });
 
 const profileSchema = z.object({
@@ -33,6 +36,7 @@ const profileSchema = z.object({
   photo: photoField,
   positions: z.array(z.enum(POSITIONS)).max(2).optional(),
   password: z.string().min(4).max(60).optional(),
+  shirtNumber: shirtField,
 });
 
 function presentPlayer<T extends { passwordHash?: string | null; birthDate?: Date | null }>(player: T) {
@@ -138,6 +142,8 @@ export async function adminRoutes(app: FastifyInstance) {
     if (body.data.password && bcrypt.compareSync(body.data.password, session.account.passwordHash)) {
       return reply.code(400).send({ message: "Escolha uma senha diferente da atual." });
     }
+    const owner = await shirtOwner(body.data.shirtNumber, session.player.id);
+    if (owner) return reply.code(409).send({ message: `Esse número já está com ${owner.name}.` });
     let photo: string | null | undefined;
     try {
       photo = await nextPhoto(session.player.id, session.player.photo, body.data.photo);
@@ -152,6 +158,7 @@ export async function adminRoutes(app: FastifyInstance) {
         birthDate: body.data.birthDate ? isoToDate(body.data.birthDate) : null,
         photo,
         positions: cleanPositions(body.data.positions ?? session.player.positions),
+        shirtNumber: body.data.shirtNumber === undefined ? undefined : body.data.shirtNumber,
       },
     });
     if (body.data.password) {
@@ -166,6 +173,8 @@ export async function adminRoutes(app: FastifyInstance) {
     const body = playerSchema.safeParse(request.body);
     if (!body.success) return reply.code(400).send({ message: "Confira o nome, o grupo e as posições." });
     if (await sameName(body.data.name)) return reply.code(409).send({ message: "Já existe um jogador com esse nome." });
+    const owner = await shirtOwner(body.data.shirtNumber);
+    if (owner) return reply.code(409).send({ message: `Esse número já está com ${owner.name}.` });
     const squad = body.data.squad ?? "mensalista";
     const player = await prisma.player.create({
       data: {
@@ -176,6 +185,7 @@ export async function adminRoutes(app: FastifyInstance) {
         squad,
         guest: body.data.guest ?? squad === "suplente",
         positions: cleanPositions(body.data.positions ?? []),
+        shirtNumber: body.data.shirtNumber ?? null,
       },
     });
     let photo: string | null | undefined;
@@ -206,6 +216,8 @@ export async function adminRoutes(app: FastifyInstance) {
     if (body.data.injured === true && !mensalista) {
       return reply.code(400).send({ message: "Só mensalista pode ficar machucado." });
     }
+    const owner = await shirtOwner(body.data.shirtNumber, request.params.id);
+    if (owner) return reply.code(409).send({ message: `Esse número já está com ${owner.name}.` });
     let photo: string | null | undefined;
     try {
       photo = await nextPhoto(current.id, current.photo, body.data.photo);
@@ -225,6 +237,7 @@ export async function adminRoutes(app: FastifyInstance) {
           guest: body.data.squad ? body.data.squad === "suplente" : body.data.guest,
           injured,
           positions: body.data.positions ? cleanPositions(body.data.positions) : undefined,
+          shirtNumber: body.data.shirtNumber === undefined ? undefined : body.data.shirtNumber,
         },
       });
       return presentPlayer(player);

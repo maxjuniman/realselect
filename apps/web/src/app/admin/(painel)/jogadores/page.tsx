@@ -30,6 +30,7 @@ type Draft = {
   group: GroupId;
   first: string;
   second: string;
+  shirtNumber: string;
 };
 
 const emptyDraft = (): Draft => ({
@@ -43,6 +44,7 @@ const emptyDraft = (): Draft => ({
   group: "mensalista",
   first: "",
   second: "",
+  shirtNumber: "",
 });
 
 export default function PlayersAdminPage() {
@@ -83,7 +85,7 @@ export default function PlayersAdminPage() {
       ...item,
       players: players
         .filter((player) => groupOf(player) === item.id)
-        .filter((player) => !term || foldName(player.name).includes(term) || foldName(player.nickname ?? "").includes(term))
+        .filter((player) => !term || foldName(player.name).includes(term) || foldName(player.nickname ?? "").includes(term) || (player.shirtNumber != null && String(player.shirtNumber) === term))
         .sort((a, b) => positionRank(a.positions?.[0]) - positionRank(b.positions?.[0]) || a.name.localeCompare(b.name, "pt-BR")),
     }));
   }, [players, query]);
@@ -101,6 +103,7 @@ export default function PlayersAdminPage() {
       name: draft.name,
       nickname: draft.nickname.trim() || null,
       birthDate: draft.birthDate || null,
+      shirtNumber: draft.shirtNumber ? Number(draft.shirtNumber) : null,
       positions,
       ...(draft.photoData ? { photo: draft.photoData } : draft.clearPhoto ? { photo: null } : {}),
       ...(draft.password.trim() ? { password: draft.password.trim() } : {}),
@@ -170,6 +173,7 @@ export default function PlayersAdminPage() {
       group: groupOf(player),
       first: player.positions?.[0] ?? "",
       second: player.positions?.[1] ?? "",
+      shirtNumber: player.shirtNumber ? String(player.shirtNumber) : "",
     });
   }
 
@@ -223,7 +227,11 @@ export default function PlayersAdminPage() {
                         <Who>
                           {player.photo ? <Face src={photoUrl(player.photo)} alt="" /> : null}
                           <Identity>
-                            <Name>{player.name}{player.nickname ? ` · ${player.nickname}` : ""}</Name>
+                            <Name>
+                              {player.shirtNumber ? <Num>{player.shirtNumber}</Num> : null}
+                              {player.name}
+                              {player.nickname ? ` · ${player.nickname}` : ""}
+                            </Name>
                             <Spot>
                               {player.injured ? "Machucado" : positions.length ? positions.join(" · ") : "Sem posição"}
                             </Spot>
@@ -297,6 +305,17 @@ export default function PlayersAdminPage() {
               <TextInput value={draft.nickname} onChange={(event) => setDraft({ ...draft, nickname: event.target.value })} />
             </Field>
             <Field>
+              Número da camisa
+              <Select aria-label="Número da camisa" value={draft.shirtNumber} onChange={(event) => setDraft({ ...draft, shirtNumber: event.target.value })}>
+                <option value="">Sem número</option>
+                {shirtChoices(players, draft.id, draft.shirtNumber).map((number) => (
+                  <option key={number} value={number}>
+                    {number}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field>
               Data de nascimento
               <TextInput type="date" value={draft.birthDate} onChange={(event) => setDraft({ ...draft, birthDate: event.target.value })} />
             </Field>
@@ -366,6 +385,17 @@ export default function PlayersAdminPage() {
       ) : null}
     </Stack>
   );
+}
+
+function shirtChoices(players: PlayerRef[], currentId: string | undefined, selected: string) {
+  const taken = new Set(players.filter((player) => player.id !== currentId && player.shirtNumber).map((player) => player.shirtNumber));
+  const numbers: number[] = [];
+  for (let number = 1; number <= 99; number += 1) {
+    if (!taken.has(number)) numbers.push(number);
+  }
+  const current = Number(selected);
+  if (current && !numbers.includes(current)) numbers.push(current);
+  return numbers.sort((left, right) => left - right);
 }
 
 function GroupIcon({ group }: { group: GroupId }) {
@@ -640,6 +670,13 @@ const TextButton = styled.button`
 
 const Name = styled.span`
   font-weight: 700;
+`;
+
+const Num = styled.span`
+  display: inline-block;
+  min-width: 1.8em;
+  margin-right: 6px;
+  color: ${({ theme }) => theme.purpleDeep};
 `;
 
 const Spot = styled.span`

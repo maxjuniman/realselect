@@ -28,6 +28,7 @@ export async function publicRoutes(app: FastifyInstance) {
         squad: true,
         injured: true,
         positions: true,
+        shirtNumber: true,
       },
     });
     return players.map((player) => ({

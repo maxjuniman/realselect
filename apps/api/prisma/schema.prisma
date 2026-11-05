@@ -36,6 +36,7 @@ model Player {
   squad        String            @default("mensalista")
   injured      Boolean           @default(false)
   positions    String[]          @default([])
+  shirtNumber  Int?              @unique
   appearances   MatchAppearance[]
   events        MatchEvent[]
   professorOf   Match[]           @relation("Professor")
