@@ -14,7 +14,7 @@ import { awardsFor, saveVote, seasonAwards } from "../lib/votes.js";
 
 const photoField = z.string().max(1_800_000).nullable().optional();
 const birthField = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional();
-const shirtField = z.number().int().min(1).max(99).nullable().optional();
+const shirtField = z.string().regex(/^(01|[1-9][0-9]?)$/).nullable().optional();
 
 const playerSchema = z.object({
   name: z.string().trim().min(2).max(60),

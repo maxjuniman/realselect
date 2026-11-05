@@ -1,33 +1,33 @@
 import { prisma } from "./prisma.js";
 
-export const KNOWN_SHIRTS: { name: string; number: number }[] = [
-  { name: "Edy", number: 1 },
-  { name: "Everton", number: 1 },
-  { name: "Rafael Chaves", number: 3 },
-  { name: "Lucão", number: 4 },
-  { name: "Max", number: 5 },
-  { name: "Dinho", number: 6 },
-  { name: "Cristiano", number: 7 },
-  { name: "Leomar", number: 8 },
-  { name: "Dioury", number: 9 },
-  { name: "Bruno", number: 10 },
-  { name: "Mateus", number: 11 },
-  { name: "Marciano", number: 12 },
-  { name: "Marcelo", number: 17 },
-  { name: "Cabral", number: 19 },
-  { name: "Iury", number: 20 },
-  { name: "Daniel", number: 23 },
-  { name: "Henrique", number: 27 },
-  { name: "Avila", number: 44 },
-  { name: "Fábio", number: 2 },
-  { name: "NG", number: 77 },
+export const KNOWN_SHIRTS: { name: string; number: string }[] = [
+  { name: "Edy", number: "1" },
+  { name: "Everton", number: "01" },
+  { name: "Rafael Chaves", number: "3" },
+  { name: "Lucão", number: "4" },
+  { name: "Max", number: "5" },
+  { name: "Dinho", number: "6" },
+  { name: "Cristiano", number: "7" },
+  { name: "Leomar", number: "8" },
+  { name: "Dioury", number: "9" },
+  { name: "Bruno", number: "10" },
+  { name: "Mateus", number: "11" },
+  { name: "Marciano", number: "12" },
+  { name: "Marcelo", number: "17" },
+  { name: "Cabral", number: "19" },
+  { name: "Iury", number: "20" },
+  { name: "Daniel", number: "23" },
+  { name: "Henrique", number: "27" },
+  { name: "Avila", number: "44" },
+  { name: "Fábio", number: "2" },
+  { name: "NG", number: "77" },
 ];
 
 function fold(name: string) {
   return name.trim().toLocaleLowerCase("pt-BR").normalize("NFD").replace(/\p{M}/gu, "");
 }
 
-function matchPlayer(players: { id: string; name: string; nickname: string | null; shirtNumber: number | null }[], label: string) {
+function matchPlayer(players: { id: string; name: string; nickname: string | null; shirtNumber: string | null }[], label: string) {
   const folded = fold(label);
   const exact = players.filter((player) => fold(player.name) === folded || fold(player.nickname ?? "") === folded);
   if (exact.length === 1) return exact[0];
@@ -39,7 +39,7 @@ function matchPlayer(players: { id: string; name: string; nickname: string | nul
   return close.length === 1 ? close[0] : undefined;
 }
 
-export async function shirtOwner(number: number | null | undefined, ignoreId?: string) {
+export async function shirtOwner(number: string | null | undefined, ignoreId?: string) {
   if (number == null) return null;
   return prisma.player.findFirst({
     where: { shirtNumber: number, ...(ignoreId ? { id: { not: ignoreId } } : {}) },
@@ -51,7 +51,7 @@ export async function applyKnownShirts() {
   const used = await prisma.player.count({ where: { shirtNumber: { not: null } } });
   if (used > 0) return 0;
   const players = await prisma.player.findMany({ select: { id: true, name: true, nickname: true, shirtNumber: true } });
-  const taken = new Set<number>();
+  const taken = new Set<string>();
   let count = 0;
   for (const row of KNOWN_SHIRTS) {
     if (taken.has(row.number)) continue;

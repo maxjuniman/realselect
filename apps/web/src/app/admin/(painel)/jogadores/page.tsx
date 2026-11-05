@@ -103,7 +103,7 @@ export default function PlayersAdminPage() {
       name: draft.name,
       nickname: draft.nickname.trim() || null,
       birthDate: draft.birthDate || null,
-      shirtNumber: draft.shirtNumber ? Number(draft.shirtNumber) : null,
+      shirtNumber: draft.shirtNumber || null,
       positions,
       ...(draft.photoData ? { photo: draft.photoData } : draft.clearPhoto ? { photo: null } : {}),
       ...(draft.password.trim() ? { password: draft.password.trim() } : {}),
@@ -389,13 +389,13 @@ export default function PlayersAdminPage() {
 
 function shirtChoices(players: PlayerRef[], currentId: string | undefined, selected: string) {
   const taken = new Set(players.filter((player) => player.id !== currentId && player.shirtNumber).map((player) => player.shirtNumber));
-  const numbers: number[] = [];
+  const numbers: string[] = [];
   for (let number = 1; number <= 99; number += 1) {
-    if (!taken.has(number)) numbers.push(number);
+    const label = String(number);
+    if (!taken.has(label)) numbers.push(label);
   }
-  const current = Number(selected);
-  if (current && !numbers.includes(current)) numbers.push(current);
-  return numbers.sort((left, right) => left - right);
+  if (selected === "01") numbers.unshift("01");
+  return numbers;
 }
 
 function GroupIcon({ group }: { group: GroupId }) {
