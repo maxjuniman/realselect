@@ -9,7 +9,7 @@ import { prisma } from "../lib/prisma.js";
 import { professorRoster, saveAbsences, saveProfessorOrder, saveProfessorPlans } from "../lib/professors.js";
 import { sendTelegramText } from "../lib/telegram-lista.js";
 import { POSITIONS, SQUADS, cleanPositions } from "../lib/roster.js";
-import { awardsFor, saveVote } from "../lib/votes.js";
+import { awardsFor, saveVote, seasonAwards } from "../lib/votes.js";
 
 const photoField = z.string().max(1_800_000).nullable().optional();
 const birthField = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional();
@@ -421,6 +421,16 @@ export async function adminRoutes(app: FastifyInstance) {
     const awards = await awardsFor(request.params.id, viewer);
     if (!awards) return reply.code(404).send({ message: "Jogo não encontrado." });
     return awards;
+  });
+
+  app.get<{ Querystring: { season?: string } }>("/admin/votes", async (request, reply) => {
+    const user = await requireUser(request, reply);
+    if (!user) return;
+    const code = request.query.season?.trim();
+    if (!code) return reply.code(400).send({ message: "Informe a temporada." });
+    const summary = await seasonAwards(code);
+    if (!summary) return reply.code(404).send({ message: "Temporada não encontrada." });
+    return summary;
   });
 
   app.put<{ Params: { id: string } }>("/matches/:id/votes", async (request, reply) => {

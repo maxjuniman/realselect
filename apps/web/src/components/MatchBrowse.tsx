@@ -2,12 +2,25 @@
 
 import { useState } from "react";
 import styled from "styled-components";
+import { LaunchList } from "@/components/LaunchList";
 import { MatchAwards } from "@/components/MatchAwards";
+import { useSession } from "@/components/Session";
 import { awardsOpen } from "@/lib/awards";
 import { formatLongDate, formatTinyDate } from "@/lib/format";
 import { placar, winnerTone } from "@/lib/score";
 import type { LinePlayer, MatchDetail } from "@/lib/types";
-import { List, ListLink, Muted, ScoreText } from "@/styles/ui";
+import { Actions, ButtonLink, List, ListLink, Muted, ScoreText } from "@/styles/ui";
+
+export function OrganizerMatchActions() {
+  const session = useSession();
+  if (session?.role === "player") return null;
+  return (
+    <Actions>
+      <LaunchList />
+      <ButtonLink href="/admin/jogos/novo">Novo jogo</ButtonLink>
+    </Actions>
+  );
+}
 
 function named(players: LinePlayer[], field: "goals" | "assists") {
   return players
@@ -19,7 +32,9 @@ function named(players: LinePlayer[], field: "goals" | "assists") {
 
 export function MatchBrowse({ matches, basePath }: { matches: MatchDetail[]; basePath: "/jogos" | "/admin/jogos" }) {
   const [openId, setOpenId] = useState<string | null>(null);
+  const session = useSession();
   const admin = basePath.startsWith("/admin");
+  const organizer = admin && session?.role !== "player";
 
   return (
     <List>
@@ -39,7 +54,7 @@ export function MatchBrowse({ matches, basePath }: { matches: MatchDetail[]; bas
                 </Meta>
               </ListLink>
               <Slot>
-                {awardsOpen(match) ? <MatchAwards matchId={match.id} playedOn={match.playedOn} players={players} ballots={admin} /> : null}
+                {awardsOpen(match) ? <MatchAwards matchId={match.id} playedOn={match.playedOn} players={players} ballots={organizer} /> : null}
               </Slot>
             </Row>
             {goals || assists ?

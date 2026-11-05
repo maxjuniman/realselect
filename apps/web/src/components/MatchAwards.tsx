@@ -14,6 +14,7 @@ type Ballot = { voterId: string; voter: string; craqueId: string; craque: string
 type Awards = {
   open: boolean;
   role: "guest" | "player" | "admin";
+  selfId: string | null;
   mine: { craqueId: string; craque: string; perebaId: string; pereba: string } | null;
   tally: { craque: Count[]; pereba: Count[] };
   ballots: Ballot[] | null;
@@ -66,8 +67,12 @@ export function MatchAwards({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, saving]);
 
+  function choices(data: Awards | null) {
+    return lineup.filter((player) => player.id !== data?.selfId);
+  }
+
   function applyMine(data: Awards) {
-    const allowed = new Set(lineup.map((player) => player.id));
+    const allowed = new Set(choices(data).map((player) => player.id));
     setCraqueId(data.mine && allowed.has(data.mine.craqueId) ? data.mine.craqueId : "");
     setPerebaId(data.mine && allowed.has(data.mine.perebaId) ? data.mine.perebaId : "");
   }
@@ -104,6 +109,10 @@ export function MatchAwards({
       setError("Escolha o craque e a pereba.");
       return;
     }
+    if (awards?.selfId && (nextCraque === awards.selfId || nextPereba === awards.selfId)) {
+      setError("Você não pode votar em si mesmo.");
+      return;
+    }
     if (nextCraque === nextPereba) {
       setError("O craque e a pereba precisam ser pessoas diferentes.");
       return;
@@ -128,9 +137,11 @@ export function MatchAwards({
     }
   }
 
-  const label = ballots ? "Votos" : awards?.mine ? "Alterar voto" : "Votar";
+  const locked = awards?.role === "player" && Boolean(awards.mine);
+  const label = ballots ? "Votos" : locked ? "Seu voto" : "Votar";
   const hasVotes = Boolean(awards && (awards.tally.craque.length || awards.tally.pereba.length));
-  const showForm = awards?.role === "player";
+  const showForm = awards?.role === "player" && !awards.mine;
+  const options = choices(awards);
 
   return (
     <>
@@ -141,7 +152,10 @@ export function MatchAwards({
         <Backdrop onMouseDown={close}>
           <Dialog role="dialog" aria-modal="true" aria-labelledby={titleId} onMouseDown={(event) => event.stopPropagation()}>
             <h2 id={titleId}>{ballots ? "Quem votou" : "Craque e pereba"}</h2>
-            <Muted>{formatLongDate(playedOn)}{ballots ? "." : ". Escolha entre quem jogou."}</Muted>
+            <Muted>
+              {formatLongDate(playedOn)}
+              {ballots ? "." : locked ? ". Seu voto não pode ser alterado." : showForm ? ". Escolha entre quem jogou, menos você." : ". Escolha entre quem jogou."}
+            </Muted>
             {loading ? <Muted>Carregando votos...</Muted> : null}
             {showForm ? (
               <Form>
@@ -149,7 +163,7 @@ export function MatchAwards({
                   Craque do jogo
                   <Select ref={craqueRef} aria-label={`Craque do jogo ${when}`} value={craqueId} onChange={(event) => setCraqueId(event.target.value)}>
                     <option value="">Escolher</option>
-                    {lineup.map((player) => (
+                    {options.map((player) => (
                       <option key={player.id} value={player.id}>
                         {player.name}
                       </option>
@@ -160,17 +174,22 @@ export function MatchAwards({
                   Pereba do jogo
                   <Select ref={perebaRef} aria-label={`Pereba do jogo ${when}`} value={perebaId} onChange={(event) => setPerebaId(event.target.value)}>
                     <option value="">Escolher</option>
-                    {lineup.map((player) => (
+                    {options.map((player) => (
                       <option key={player.id} value={player.id}>
                         {player.name}
                       </option>
                     ))}
                   </Select>
                 </Field>
-                <PrimaryButton type="button" disabled={saving || !lineup.length} onClick={() => void save()}>
+                <PrimaryButton type="button" disabled={saving || options.length < 2} onClick={() => void save()}>
                   {saving ? "Salvando..." : "Salvar voto"}
                 </PrimaryButton>
               </Form>
+            ) : null}
+            {locked && awards?.mine ? (
+              <p>
+                Seu voto: craque {awards.mine.craque}, pereba {awards.mine.pereba}.
+              </p>
             ) : null}
             {awards?.role === "guest" ? <Enter href="/admin/login">Entre para escolher o craque e a pereba.</Enter> : null}
             {awards?.role === "admin" ? (

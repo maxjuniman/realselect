@@ -12,6 +12,7 @@ import { AdminLink, AdminNav, AdminShell, GhostButton, Muted } from "@/styles/ui
 const adminLinks = [
   { href: "/admin", label: "Resumo" },
   { href: "/admin/jogos", label: "Jogos" },
+  { href: "/admin/votacao", label: "Votação" },
   { href: "/admin/jogadores", label: "Jogadores" },
   { href: "/admin/professores", label: "Professores" },
   { href: "/admin/historico", label: "Histórico" },
@@ -22,7 +23,7 @@ const adminLinks = [
 
 const playerLinks = [
   { href: "/admin", label: "Resumo" },
-  { href: "/jogos", label: "Jogos" },
+  { href: "/admin/jogos", label: "Jogos" },
   { href: "/admin/jogadores", label: "Jogadores" },
 ];
 
@@ -48,7 +49,8 @@ export default function PainelLayout({ children }: { children: React.ReactNode }
       });
   }, [router]);
 
-  const allowed = !session || session.role !== "player" || pathname === "/admin" || pathname.startsWith("/admin/jogadores");
+  const playerGame = pathname === "/admin/jogos" || (pathname.startsWith("/admin/jogos/") && !pathname.startsWith("/admin/jogos/novo"));
+  const allowed = !session || session.role !== "player" || pathname === "/admin" || pathname.startsWith("/admin/jogadores") || playerGame;
 
   useEffect(() => {
     if (session && !allowed) router.replace("/admin");
