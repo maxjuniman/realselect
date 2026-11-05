@@ -388,13 +388,13 @@ export default function PlayersAdminPage() {
 }
 
 function shirtChoices(players: PlayerRef[], currentId: string | undefined, selected: string) {
-  const taken = new Set(players.filter((player) => player.id !== currentId && player.shirtNumber).map((player) => player.shirtNumber));
-  const numbers: string[] = [];
+  const taken = new Set(players.filter((player) => player.id !== currentId && player.shirtNumber).map((player) => String(player.shirtNumber)));
+  const numbers = taken.has("01") ? [] : ["01"];
   for (let number = 1; number <= 99; number += 1) {
     const label = String(number);
     if (!taken.has(label)) numbers.push(label);
   }
-  if (selected === "01") numbers.unshift("01");
+  if (selected && !numbers.includes(selected)) numbers.unshift(selected);
   return numbers;
 }
 

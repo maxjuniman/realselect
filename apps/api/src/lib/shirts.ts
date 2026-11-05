@@ -48,10 +48,8 @@ export async function shirtOwner(number: string | null | undefined, ignoreId?: s
 }
 
 export async function applyKnownShirts() {
-  const used = await prisma.player.count({ where: { shirtNumber: { not: null } } });
-  if (used > 0) return 0;
   const players = await prisma.player.findMany({ select: { id: true, name: true, nickname: true, shirtNumber: true } });
-  const taken = new Set<string>();
+  const taken = new Set(players.flatMap((player) => (player.shirtNumber ? [player.shirtNumber] : [])));
   let count = 0;
   for (const row of KNOWN_SHIRTS) {
     if (taken.has(row.number)) continue;
