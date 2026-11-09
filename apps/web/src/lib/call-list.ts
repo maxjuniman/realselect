@@ -69,7 +69,7 @@ function byQueue(dates: Map<string, string>) {
 }
 
 function substituteGroups(players: PlayerRef[], matches: MatchDetail[]) {
-  const active = players.filter((player) => player.active !== false && isSuplente(player) && player.name.trim().toLocaleLowerCase("pt-BR") !== "gol contra");
+  const active = players.filter((player) => player.active !== false && isSuplente(player) && !player.injured && player.name.trim().toLocaleLowerCase("pt-BR") !== "gol contra");
   const queue = byQueue(latestDates(matches).playedOn);
   return {
     keepers: active.filter(isKeeper).sort(queue),

@@ -211,10 +211,10 @@ export async function adminRoutes(app: FastifyInstance) {
     if (!current) return reply.code(404).send({ message: "Jogador não encontrado." });
     const squad = body.data.squad ?? current.squad;
     const active = body.data.active ?? current.active;
-    const mensalista = active && squad === "mensalista" && !current.guest && (body.data.guest ?? current.guest) !== true;
-    const injured = mensalista ? (body.data.injured ?? current.injured) : false;
-    if (body.data.injured === true && !mensalista) {
-      return reply.code(400).send({ message: "Só mensalista pode ficar machucado." });
+    const listed = active && (squad === "mensalista" || squad === "suplente");
+    const injured = listed ? (body.data.injured ?? current.injured) : false;
+    if (body.data.injured === true && !listed) {
+      return reply.code(400).send({ message: "Só jogador ativo pode ficar machucado." });
     }
     const owner = await shirtOwner(body.data.shirtNumber, request.params.id);
     if (owner) return reply.code(409).send({ message: `Esse número já está com ${owner.name}.` });

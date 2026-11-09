@@ -138,7 +138,7 @@ export default function PlayersAdminPage() {
     try {
       await clientApi(`/admin/players/${player.id}`, {
         method: "PATCH",
-        body: JSON.stringify(next === "inativo" ? { active: false, injured: false } : { active: true, squad: next, injured: next === "mensalista" ? Boolean(player.injured) : false }),
+        body: JSON.stringify(next === "inativo" ? { active: false, injured: false } : { active: true, squad: next, injured: Boolean(player.injured) }),
       });
       await load();
     } catch (caught) {
@@ -244,7 +244,7 @@ export default function PlayersAdminPage() {
                                 <PencilIcon />
                               </IconButton>
                             ) : null
-                          ) : item.id === "mensalista" ? (
+                          ) : item.id === "inativo" ? null : (
                             <HurtButton
                               type="button"
                               $on={Boolean(player.injured)}
@@ -255,7 +255,7 @@ export default function PlayersAdminPage() {
                             >
                               <HurtIcon $on={Boolean(player.injured)} />
                             </HurtButton>
-                          ) : null}
+                          )}
                           {mine ? null : (
                             <>
                               <IconButton type="button" aria-label={`Editar ${player.name}`} title="Editar" onClick={() => edit(player)}>
