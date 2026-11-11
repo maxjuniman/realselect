@@ -10,6 +10,7 @@ const links = [
   { href: "/historico", label: "Histórico" },
   { href: "/artilharia", label: "Artilharia" },
   { href: "/presenca", label: "Presença" },
+  { href: "/recordes", label: "Recordes" },
 ];
 
 const Bar = styled.header`

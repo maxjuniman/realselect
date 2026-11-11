@@ -27,6 +27,13 @@ export type PlayerRef = {
   shirtNumber?: string | null;
 };
 
+export type ClubRecord = {
+  id: string;
+  title: string;
+  value: string;
+  holders: { name: string; note: string }[];
+};
+
 export type Session =
   | { role: "admin"; id: string; name: string; email: string }
   | { role: "player"; id: string; name: string };

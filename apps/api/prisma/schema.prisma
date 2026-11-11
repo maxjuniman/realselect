@@ -134,6 +134,25 @@ model MatchVote {
   @@id([matchId, voterId])
 }
 
+model ClubRecord {
+  id      String         @id @default(cuid())
+  title   String
+  value   String
+  sort    Int
+  holders RecordHolder[]
+}
+
+model RecordHolder {
+  id       String     @id @default(cuid())
+  recordId String
+  record   ClubRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  name     String
+  note     String     @default("")
+  sort     Int
+
+  @@index([recordId])
+}
+
 model MatchEvent {
   id       String  @id @default(cuid())
   matchId  String

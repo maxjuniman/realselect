@@ -9,6 +9,7 @@ import { prisma } from "../lib/prisma.js";
 import { professorRoster, saveAbsences, saveProfessorOrder, saveProfessorPlans } from "../lib/professors.js";
 import { sendTelegramText } from "../lib/telegram-lista.js";
 import { POSITIONS, SQUADS, cleanPositions } from "../lib/roster.js";
+import { saveRecords } from "../lib/records.js";
 import { shirtOwner } from "../lib/shirts.js";
 import { awardsFor, saveVote, seasonAwards } from "../lib/votes.js";
 
@@ -548,6 +549,26 @@ export async function adminRoutes(app: FastifyInstance) {
     const saved = await saveAbsences(body.data.playedOn, body.data.playerIds);
     if (!saved.ok) return reply.code(400).send({ message: saved.error });
     return professorRoster();
+  });
+
+  app.put("/admin/records", async (request, reply) => {
+    const user = await requireUser(request, reply);
+    if (!user) return;
+    const body = z
+      .object({
+        records: z
+          .array(
+            z.object({
+              title: z.string().trim().min(2).max(80),
+              value: z.string().trim().min(1).max(20),
+              holders: z.array(z.object({ name: z.string().trim().min(1).max(60), note: z.string().trim().max(40).optional() })).max(20),
+            }),
+          )
+          .max(30),
+      })
+      .safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ message: "Confira o nome do recorde, a marca e quem bateu." });
+    return saveRecords(body.data.records);
   });
 
   app.patch<{ Params: { id: string } }>("/admin/seasons/:id", async (request, reply) => {

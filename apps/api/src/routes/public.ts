@@ -3,6 +3,7 @@ import { addDays, dateToIso } from "../lib/dates.js";
 import { matchInclude, presentMatch } from "../lib/matches.js";
 import { prisma } from "../lib/prisma.js";
 import { isRankingPlayer, playerScore } from "../lib/results.js";
+import { listRecords } from "../lib/records.js";
 import { getSeason, scorersFor, standingsFor } from "../lib/standings.js";
 
 export async function publicRoutes(app: FastifyInstance) {
@@ -12,6 +13,8 @@ export async function publicRoutes(app: FastifyInstance) {
     const seasons = await prisma.season.findMany({ orderBy: [{ year: "desc" }, { half: "desc" }] });
     return seasons;
   });
+
+  app.get("/records", async () => listRecords());
 
   app.get("/players", async () => {
     const players = await prisma.player.findMany({

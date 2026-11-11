@@ -4,6 +4,7 @@ import cors from "@fastify/cors";
 import Fastify from "fastify";
 import { uploadPath } from "./lib/photos.js";
 import { ensureProfessorOrder } from "./lib/professors.js";
+import { ensureRecords } from "./lib/records.js";
 import { applyKnownShirts } from "./lib/shirts.js";
 import { prisma } from "./lib/prisma.js";
 import { cleanPositions } from "./lib/roster.js";
@@ -46,6 +47,8 @@ export async function start() {
   await ensureProfessorOrder();
   const shirts = await applyKnownShirts();
   if (shirts) app.log.info({ count: shirts }, "Números de camisa aplicados.");
+  const records = await ensureRecords();
+  if (records) app.log.info({ count: records }, "Recordes iniciais gravados.");
 
   const port = Number(process.env.PORT || 3333);
   await app.listen({ port, host: "0.0.0.0" });
