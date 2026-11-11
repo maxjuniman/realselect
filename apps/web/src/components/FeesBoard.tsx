@@ -13,7 +13,6 @@ const MONTHS = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "jul
 const FLOW = [
   { key: "paid", label: "Mensal pago" },
   { key: "goalkeeper", label: "Goleiro" },
-  { key: "missing", label: "Jogador faltante" },
   { key: "gear", label: "Bola/Medalhas" },
   { key: "extra", label: "Sup jogo/Churrasco" },
   { key: "fee", label: "Mensalidade/Filmagem" },
@@ -140,6 +139,7 @@ export function FeesBoard() {
             year: row.year,
             month: row.month,
             carried: row.carried,
+            missing: 0,
             ...row.values,
           })),
         }),
