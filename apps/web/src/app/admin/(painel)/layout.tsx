@@ -16,6 +16,7 @@ const adminLinks = [
   { href: "/admin/jogadores", label: "Jogadores" },
   { href: "/admin/professores", label: "Professores" },
   { href: "/admin/historico", label: "Histórico" },
+  { href: "/admin/recordes", label: "Recordes" },
   { href: "/admin/sequencia", label: "Sequência" },
   { href: "/admin/temporadas", label: "Temporadas" },
   { href: "/admin/usuarios", label: "Usuários" },
