@@ -38,11 +38,6 @@ function monthLabel(year: number, month: number) {
   return `${MONTHS[month - 1]}/${String(year).slice(2)}`;
 }
 
-function seasonOf(year: number, month: number) {
-  const half = month <= 6 ? 1 : 2;
-  return { code: `0${half}_${year}`, name: `${half}º semestre ${year}` };
-}
-
 function blank(year: number, month: number): Draft {
   const zeros = Object.fromEntries(FLOW.map((column) => [column.key, "0,00"])) as Record<FlowKey, string>;
   return { key: `${year}-${month}`, year, month, carried: "0,00", ...zeros };
@@ -92,15 +87,16 @@ function shownFrom(months: FeeMonth[]): Shown[] {
   }));
 }
 
-function groupsOf(rows: Shown[]) {
-  const groups: { code: string; name: string; rows: Shown[] }[] = [];
+function yearsOf(rows: Shown[]) {
+  const byYear = new Map<number, Shown[]>();
   for (const row of rows) {
-    const season = seasonOf(row.year, row.month);
-    const last = groups.at(-1);
-    if (!last || last.code !== season.code) groups.push({ ...season, rows: [row] });
-    else last.rows.push(row);
+    const list = byYear.get(row.year) ?? [];
+    list.push(row);
+    byYear.set(row.year, list);
   }
-  return groups;
+  return [...byYear.entries()]
+    .sort((a, b) => b[0] - a[0])
+    .map(([year, months]) => ({ year, months: [...months].sort((a, b) => b.month - a.month) }));
 }
 
 export function FeesBoard() {
@@ -108,17 +104,20 @@ export function FeesBoard() {
   const admin = session?.role === "admin";
   const [months, setMonths] = useState<FeeMonth[] | null>(null);
   const [draft, setDraft] = useState<Draft[] | null>(null);
+  const [openYears, setOpenYears] = useState<number[] | null>(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     clientApi<FeeMonth[]>("/fees")
       .then(setMonths)
-      .catch((caught) => setError(caught instanceof Error ? caught.message : "Não foi possível abrir a mensalidade."));
+      .catch((caught) => setError(caught instanceof Error ? caught.message : "Não foi possível abrir o financeiro."));
   }, []);
 
   const rows = draft ? lined(draft) : months ? shownFrom(months) : [];
-  const groups = groupsOf(rows);
+  const years = yearsOf(rows);
+  const currentYear = years[0]?.year ?? new Date().getFullYear();
+  const opened = openYears ?? (years.length ? [currentYear] : []);
 
   function change(key: string, field: "carried" | FlowKey, value: string) {
     setDraft((current) => current?.map((row) => (row.key === key ? { ...row, [field]: value } : row)) ?? null);
@@ -148,7 +147,7 @@ export function FeesBoard() {
       setMonths(saved);
       setDraft(null);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Não foi possível salvar a mensalidade.");
+      setError(caught instanceof Error ? caught.message : "Não foi possível salvar o financeiro.");
     } finally {
       setSaving(false);
     }
@@ -158,8 +157,8 @@ export function FeesBoard() {
     <section>
       <PanelHead $flush>
         <div>
-          <PageTitle>Mensalidade</PageTitle>
-          <Lead>Caixa do mês, separado por temporada. A sobra é o saldo do mês anterior. Arraste a tabela para o lado para ver sup jogo, mensalidade e churrasco.</Lead>
+          <PageTitle>Financeiro</PageTitle>
+          <Lead>Caixa do mês, do mais recente para o mais antigo. A sobra é o saldo do mês anterior. Arraste a tabela para o lado para ver as outras colunas.</Lead>
         </div>
         {admin && months && !draft ? (
           <GhostButton type="button" onClick={() => { setError(""); setDraft(draftFrom(months)); }}>
@@ -178,10 +177,39 @@ export function FeesBoard() {
         ) : null}
       </PanelHead>
       {error ? <ErrorText>{error}</ErrorText> : null}
-      {!months && !error ? <Muted>Abrindo a mensalidade...</Muted> : null}
-      {groups.map((group) => (
-        <SeasonBlock key={group.code}>
-          <SeasonTitle>{group.name}</SeasonTitle>
+      {!months && !error ? <Muted>Abrindo o financeiro...</Muted> : null}
+      {years.map((group) => {
+        const expanded = opened.includes(group.year);
+        return (
+        <SeasonBlock key={group.year}>
+          <YearToggle type="button" aria-expanded={expanded} aria-label={`${expanded ? "Fechar" : "Abrir"} ${group.year}`} onClick={() => setOpenYears((current) => {
+            const list = current ?? [currentYear];
+            return list.includes(group.year) ? list.filter((year) => year !== group.year) : [...list, group.year];
+          })}>
+            <Caret $open={expanded} />
+            <SeasonTitle>{group.year}</SeasonTitle>
+            {group.months[0] ? <YearBalance><Amount value={group.months[0].balance} $strong /></YearBalance> : null}
+          </YearToggle>
+          {draft && group.year === currentYear ? (
+            <Add
+              type="button"
+              onClick={() =>
+                setDraft((current) => {
+                  const last = lined(current ?? []).at(-1);
+                  const next = last ? new Date(last.year, last.month, 1) : new Date();
+                  const year = next.getFullYear();
+                  setOpenYears((open) => {
+                    const list = open ?? [currentYear];
+                    return list.includes(year) ? list : [...list, year];
+                  });
+                  return [...(current ?? []), blank(year, next.getMonth() + 1)];
+                })
+              }
+            >
+              Incluir mês
+            </Add>
+          ) : null}
+          {expanded ? (
           <TableWrap>
             <FeeTable>
               <thead>
@@ -196,7 +224,7 @@ export function FeesBoard() {
                 </tr>
               </thead>
               <tbody>
-                {group.rows.map((row) => (
+                {group.months.map((row) => (
                   <tr key={row.key}>
                     <PinCell $edge="left">{monthLabel(row.year, row.month)}</PinCell>
                     <Td $num>
@@ -230,23 +258,11 @@ export function FeesBoard() {
               </tbody>
             </FeeTable>
           </TableWrap>
+          ) : null}
         </SeasonBlock>
-      ))}
-      {months && !groups.length ? <Muted>Nenhum mês cadastrado.</Muted> : null}
-      {draft ? (
-        <Add
-          type="button"
-          onClick={() =>
-            setDraft((current) => {
-              const last = lined(current ?? []).at(-1);
-              const next = last ? new Date(last.year, last.month, 1) : new Date();
-              return [...(current ?? []), blank(next.getFullYear(), next.getMonth() + 1)];
-            })
-          }
-        >
-          Incluir mês
-        </Add>
-      ) : null}
+        );
+      })}
+      {months && !years.length ? <Muted>Nenhum mês cadastrado.</Muted> : null}
     </section>
   );
 }
@@ -270,9 +286,41 @@ const SeasonBlock = styled.section`
   border-top: 4px solid ${({ theme }) => theme.purple};
 `;
 
-const SeasonTitle = styled.h2`
-  margin: 14px 0;
+const YearToggle = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin: 12px 0;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.purpleDeep};
+    outline-offset: 3px;
+  }
+`;
+
+const Caret = styled.span<{ $open: boolean }>`
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-right: 2px solid ${({ theme }) => theme.ink};
+  border-bottom: 2px solid ${({ theme }) => theme.ink};
+  transform: rotate(${({ $open }) => ($open ? "45deg" : "-45deg")});
+  margin-top: ${({ $open }) => ($open ? "-4px" : "2px")};
+`;
+
+const SeasonTitle = styled.span`
   font-size: 22px;
+  font-weight: 700;
+`;
+
+const YearBalance = styled.span`
+  margin-left: auto;
 `;
 
 const pin = css<{ $edge: "left" | "right" }>`
@@ -339,5 +387,5 @@ const Remove = styled.button`
 `;
 
 const Add = styled(GhostButton)`
-  margin-top: 20px;
+  margin: 0 0 16px;
 `;

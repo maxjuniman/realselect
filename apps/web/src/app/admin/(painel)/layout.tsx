@@ -17,7 +17,7 @@ const adminLinks = [
   { href: "/admin/professores", label: "Professores" },
   { href: "/admin/historico", label: "Histórico" },
   { href: "/admin/recordes", label: "Recordes" },
-  { href: "/admin/mensalidade", label: "Mensalidade" },
+  { href: "/admin/financeiro", label: "Financeiro" },
   { href: "/admin/sequencia", label: "Sequência" },
   { href: "/admin/temporadas", label: "Temporadas" },
   { href: "/admin/usuarios", label: "Usuários" },
@@ -27,7 +27,7 @@ const playerLinks = [
   { href: "/admin", label: "Resumo" },
   { href: "/admin/jogos", label: "Jogos" },
   { href: "/admin/jogadores", label: "Jogadores" },
-  { href: "/admin/mensalidade", label: "Mensalidade" },
+  { href: "/admin/financeiro", label: "Financeiro" },
 ];
 
 const AdminMain = styled.div`
@@ -58,7 +58,7 @@ export default function PainelLayout({ children }: { children: React.ReactNode }
     session.role !== "player" ||
     pathname === "/admin" ||
     pathname.startsWith("/admin/jogadores") ||
-    pathname.startsWith("/admin/mensalidade") ||
+    pathname.startsWith("/admin/financeiro") ||
     playerGame;
 
   useEffect(() => {
