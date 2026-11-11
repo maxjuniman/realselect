@@ -153,6 +153,22 @@ model RecordHolder {
   @@index([recordId])
 }
 
+model FeeMonth {
+  id         String @id @default(cuid())
+  year       Int
+  month      Int
+  carried    Int
+  paid       Int
+  goalkeeper Int
+  missing    Int
+  gear       Int
+  extra      Int
+  fee        Int
+  barbecue   Int
+
+  @@unique([year, month])
+}
+
 model MatchEvent {
   id       String  @id @default(cuid())
   matchId  String

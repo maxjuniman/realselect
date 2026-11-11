@@ -9,6 +9,7 @@ import { prisma } from "../lib/prisma.js";
 import { professorRoster, saveAbsences, saveProfessorOrder, saveProfessorPlans } from "../lib/professors.js";
 import { sendTelegramText } from "../lib/telegram-lista.js";
 import { POSITIONS, SQUADS, cleanPositions } from "../lib/roster.js";
+import { listFees, saveFees } from "../lib/fees.js";
 import { saveRecords } from "../lib/records.js";
 import { shirtOwner } from "../lib/shirts.js";
 import { awardsFor, saveVote, seasonAwards } from "../lib/votes.js";
@@ -549,6 +550,36 @@ export async function adminRoutes(app: FastifyInstance) {
     const saved = await saveAbsences(body.data.playedOn, body.data.playerIds);
     if (!saved.ok) return reply.code(400).send({ message: saved.error });
     return professorRoster();
+  });
+
+  const cents = z.number().int().min(-10_000_000).max(10_000_000);
+  const feeSchema = z.object({
+    year: z.number().int().min(2000).max(2100),
+    month: z.number().int().min(1).max(12),
+    carried: cents,
+    paid: cents,
+    goalkeeper: cents,
+    missing: cents,
+    gear: cents,
+    extra: cents,
+    fee: cents,
+    barbecue: cents,
+  });
+
+  app.get("/fees", async (request, reply) => {
+    const session = await requireSession(request, reply);
+    if (!session) return;
+    return listFees();
+  });
+
+  app.put("/admin/fees", async (request, reply) => {
+    const user = await requireUser(request, reply);
+    if (!user) return;
+    const body = z.object({ months: z.array(feeSchema).max(240) }).safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ message: "Confira os meses e os valores da mensalidade." });
+    const saved = await saveFees(body.data.months);
+    if (!saved.ok) return reply.code(400).send({ message: saved.error });
+    return saved.fees;
   });
 
   app.put("/admin/records", async (request, reply) => {

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import styled from "styled-components";
 import { clientApi } from "@/lib/client";
 import type { ClubRecord, Session } from "@/lib/types";
-import { Actions, ErrorText, Field, GhostButton, Muted, PageTitle, PanelHead, PrimaryButton, TextInput } from "@/styles/ui";
+import { Actions, DangerButton, ErrorText, Field, GhostButton, Muted, PageTitle, PanelHead, PrimaryButton, TextInput } from "@/styles/ui";
 
 type DraftHolder = { key: string; name: string; note: string };
 type DraftRecord = { key: string; title: string; value: string; holders: DraftHolder[] };
@@ -96,59 +96,65 @@ export function RecordsBoard({ initial }: { initial: ClubRecord[] }) {
       {draft ? (
         <Editor>
           {draft.map((record, index) => (
-            <Block key={record.key}>
-              <Pair>
-                <Field>
-                  Recorde
-                  <TextInput aria-label={`Nome do recorde ${index + 1}`} value={record.title} onChange={(event) => update(index, { ...record, title: event.target.value })} />
-                </Field>
-                <Field>
-                  Marca
-                  <TextInput aria-label={`Marca do recorde ${index + 1}`} value={record.value} onChange={(event) => update(index, { ...record, value: event.target.value })} />
-                </Field>
-              </Pair>
-              <Who>Quem empatou</Who>
-              {record.holders.map((holder, holderIndex) => (
-                <Pair key={holder.key}>
+            <Card key={record.key}>
+              <CardHead>
+                <Index>{index + 1}</Index>
+                <CardTitle>{record.title.trim() || "Novo recorde"}</CardTitle>
+              </CardHead>
+              <Section>
+                <SectionLabel>A marca</SectionLabel>
+                <MarkRow>
                   <Field>
-                    Nome
-                    <TextInput
-                      aria-label={`Nome ${holderIndex + 1} do recorde ${index + 1}`}
-                      value={holder.name}
-                      onChange={(event) => {
-                        const holders = record.holders.map((item, itemIndex) => (itemIndex === holderIndex ? { ...item, name: event.target.value } : item));
-                        update(index, { ...record, holders });
-                      }}
-                    />
+                    Nome do recorde
+                    <TextInput aria-label={`Nome do recorde ${index + 1}`} value={record.title} onChange={(event) => update(index, { ...record, title: event.target.value })} />
                   </Field>
                   <Field>
-                    Quando
-                    <TextInput
-                      aria-label={`Quando ${holderIndex + 1} do recorde ${index + 1}`}
-                      value={holder.note}
-                      onChange={(event) => {
-                        const holders = record.holders.map((item, itemIndex) => (itemIndex === holderIndex ? { ...item, note: event.target.value } : item));
-                        update(index, { ...record, holders });
-                      }}
-                    />
+                    Número
+                    <TextInput aria-label={`Marca do recorde ${index + 1}`} value={record.value} onChange={(event) => update(index, { ...record, value: event.target.value })} />
                   </Field>
-                  <GhostButton
-                    type="button"
-                    onClick={() => update(index, { ...record, holders: record.holders.filter((item) => item.key !== holder.key) })}
-                  >
-                    Tirar
-                  </GhostButton>
-                </Pair>
-              ))}
-              <Actions>
+                </MarkRow>
+              </Section>
+              <Section>
+                <SectionLabel>Quem tem essa marca</SectionLabel>
+                <People>
+                  {record.holders.map((holder, holderIndex) => (
+                    <Person key={holder.key}>
+                      <Field>
+                        Nome
+                        <TextInput
+                          aria-label={`Nome ${holderIndex + 1} do recorde ${index + 1}`}
+                          value={holder.name}
+                          onChange={(event) => {
+                            const holders = record.holders.map((item, itemIndex) => (itemIndex === holderIndex ? { ...item, name: event.target.value } : item));
+                            update(index, { ...record, holders });
+                          }}
+                        />
+                      </Field>
+                      <Field>
+                        Quando
+                        <TextInput
+                          aria-label={`Quando ${holderIndex + 1} do recorde ${index + 1}`}
+                          value={holder.note}
+                          onChange={(event) => {
+                            const holders = record.holders.map((item, itemIndex) => (itemIndex === holderIndex ? { ...item, note: event.target.value } : item));
+                            update(index, { ...record, holders });
+                          }}
+                        />
+                      </Field>
+                      <Remove type="button" aria-label={`Tirar ${holder.name || `nome ${holderIndex + 1}`} de ${record.title || `recorde ${index + 1}`}`} onClick={() => update(index, { ...record, holders: record.holders.filter((item) => item.key !== holder.key) })}>
+                        Tirar
+                      </Remove>
+                    </Person>
+                  ))}
+                </People>
                 <GhostButton type="button" aria-label={`Incluir empate em ${record.title || `recorde ${index + 1}`}`} onClick={() => update(index, { ...record, holders: [...record.holders, { key: key(), name: "", note: "" }] })}>
                   Incluir empate
                 </GhostButton>
-                <GhostButton type="button" onClick={() => setDraft((current) => current?.filter((item) => item.key !== record.key) ?? null)}>
-                  Apagar recorde
-                </GhostButton>
-              </Actions>
-            </Block>
+              </Section>
+              <DangerButton type="button" onClick={() => setDraft((current) => current?.filter((item) => item.key !== record.key) ?? null)}>
+                Apagar este recorde
+              </DangerButton>
+            </Card>
           ))}
           <GhostButton
             type="button"
@@ -238,29 +244,95 @@ const Holders = styled.ul`
 const Editor = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  margin-top: 20px;
+  gap: 28px;
+  margin-top: 24px;
 `;
 
-const Who = styled.p`
-  margin: 4px 0 0;
-  font-weight: 700;
-`;
-
-const Block = styled.div`
+const Card = styled.article`
   display: flex;
   flex-direction: column;
+  gap: 18px;
+  padding: 18px;
+  background: ${({ theme }) => theme.card};
+  border: 1px solid ${({ theme }) => theme.line};
+  border-top: 4px solid ${({ theme }) => theme.purple};
+`;
+
+const CardHead = styled.div`
+  display: flex;
+  align-items: center;
   gap: 12px;
-  padding-bottom: 16px;
+  padding-bottom: 12px;
   border-bottom: 1px solid ${({ theme }) => theme.line};
 `;
 
-const Pair = styled.div`
+const Index = styled.span`
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(120px, 0.8fr) auto;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  background: ${({ theme }) => theme.purpleDeep};
+  color: white;
+  font-weight: 700;
+`;
+
+const CardTitle = styled.h2`
+  margin: 0;
+  font-size: 22px;
+`;
+
+const Section = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+`;
+
+const SectionLabel = styled.p`
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: ${({ theme }) => theme.muted};
+`;
+
+const MarkRow = styled.div`
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 140px;
   gap: 12px;
-  align-items: end;
   @media (max-width: 860px) {
     grid-template-columns: 1fr;
+  }
+`;
+
+const People = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+`;
+
+const Person = styled.div`
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 160px auto;
+  gap: 12px;
+  align-items: end;
+  padding: 12px;
+  background: ${({ theme }) => theme.paper};
+  @media (max-width: 860px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const Remove = styled.button`
+  height: 44px;
+  border: 0;
+  background: transparent;
+  color: ${({ theme }) => theme.loss};
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.purpleDeep};
+    outline-offset: 2px;
   }
 `;

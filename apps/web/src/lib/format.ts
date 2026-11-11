@@ -32,6 +32,34 @@ export function formatDiff(value: number) {
   return value > 0 ? `+${value}` : String(value);
 }
 
+export function formatMoney(cents: number) {
+  const sign = cents < 0 ? "-" : "";
+  const abs = Math.abs(cents);
+  const reais = Math.floor(abs / 100).toLocaleString("pt-BR");
+  const frac = String(abs % 100).padStart(2, "0");
+  return `${sign}R$ ${reais},${frac}`;
+}
+
+export function moneyInput(cents: number) {
+  return formatMoney(cents).replace("R$ ", "");
+}
+
+export function parseMoney(text: string) {
+  const cleaned = text.trim().replace(/\s/g, "").replace("R$", "").replace("−", "-");
+  if (!cleaned) return 0;
+  const negative = cleaned.startsWith("-");
+  const body = cleaned.replace(/-/g, "");
+  if (!body || body === ",") return null;
+  let normalized = body;
+  if (body.includes(",") && body.includes(".")) normalized = body.replace(/\./g, "").replace(",", ".");
+  else if (body.includes(",")) normalized = body.replace(",", ".");
+  else if (/^\d{1,3}(\.\d{3})+$/.test(body)) normalized = body.replace(/\./g, "");
+  if (!/^\d+(\.\d{1,2})?$/.test(normalized)) return null;
+  const [reais, frac = ""] = normalized.split(".");
+  const cents = Number(reais) * 100 + Number(frac.padEnd(2, "0").slice(0, 2));
+  return negative ? -cents : cents;
+}
+
 export function resultLabel(result: "win" | "loss" | "draw") {
   if (result === "win") return "Vitória";
   if (result === "draw") return "Empate";

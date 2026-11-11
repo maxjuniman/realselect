@@ -27,6 +27,21 @@ export type PlayerRef = {
   shirtNumber?: string | null;
 };
 
+export type FeeMonth = {
+  id: string;
+  year: number;
+  month: number;
+  carried: number;
+  paid: number;
+  goalkeeper: number;
+  missing: number;
+  gear: number;
+  extra: number;
+  fee: number;
+  barbecue: number;
+  balance: number;
+};
+
 export type ClubRecord = {
   id: string;
   title: string;

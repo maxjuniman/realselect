@@ -17,6 +17,7 @@ const adminLinks = [
   { href: "/admin/professores", label: "Professores" },
   { href: "/admin/historico", label: "Histórico" },
   { href: "/admin/recordes", label: "Recordes" },
+  { href: "/admin/mensalidade", label: "Mensalidade" },
   { href: "/admin/sequencia", label: "Sequência" },
   { href: "/admin/temporadas", label: "Temporadas" },
   { href: "/admin/usuarios", label: "Usuários" },
@@ -26,6 +27,7 @@ const playerLinks = [
   { href: "/admin", label: "Resumo" },
   { href: "/admin/jogos", label: "Jogos" },
   { href: "/admin/jogadores", label: "Jogadores" },
+  { href: "/admin/mensalidade", label: "Mensalidade" },
 ];
 
 const AdminMain = styled.div`
@@ -51,7 +53,13 @@ export default function PainelLayout({ children }: { children: React.ReactNode }
   }, [router]);
 
   const playerGame = pathname === "/admin/jogos" || (pathname.startsWith("/admin/jogos/") && !pathname.startsWith("/admin/jogos/novo"));
-  const allowed = !session || session.role !== "player" || pathname === "/admin" || pathname.startsWith("/admin/jogadores") || playerGame;
+  const allowed =
+    !session ||
+    session.role !== "player" ||
+    pathname === "/admin" ||
+    pathname.startsWith("/admin/jogadores") ||
+    pathname.startsWith("/admin/mensalidade") ||
+    playerGame;
 
   useEffect(() => {
     if (session && !allowed) router.replace("/admin");
