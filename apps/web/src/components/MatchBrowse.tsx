@@ -1,14 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import styled from "styled-components";
+import { ImportFutStats } from "@/components/ImportFutStats";
 import { LaunchList } from "@/components/LaunchList";
 import { MatchAwards } from "@/components/MatchAwards";
 import { useSession } from "@/components/Session";
+import { clientApi } from "@/lib/client";
 import { awardsOpen } from "@/lib/awards";
 import { formatLongDate, formatTinyDate } from "@/lib/format";
 import { placar, winnerTone } from "@/lib/score";
-import type { LinePlayer, MatchDetail } from "@/lib/types";
+import type { FutStatsCatalog, LinePlayer, MatchDetail } from "@/lib/types";
+import Link from "next/link";
 import { Actions, ButtonLink, List, ListLink, Muted, ScoreText } from "@/styles/ui";
 
 export function OrganizerMatchActions() {
@@ -17,6 +20,7 @@ export function OrganizerMatchActions() {
   return (
     <Actions>
       <LaunchList />
+      <ImportFutStats />
       <ButtonLink href="/admin/jogos/novo">Novo jogo</ButtonLink>
     </Actions>
   );
@@ -32,9 +36,16 @@ function named(players: LinePlayer[], field: "goals" | "assists") {
 
 export function MatchBrowse({ matches, basePath }: { matches: MatchDetail[]; basePath: "/jogos" | "/admin/jogos" }) {
   const [openId, setOpenId] = useState<string | null>(null);
+  const [videos, setVideos] = useState<Set<string>>(new Set());
   const session = useSession();
   const admin = basePath.startsWith("/admin");
   const organizer = admin && session?.role !== "player";
+
+  useEffect(() => {
+    clientApi<FutStatsCatalog>("/futstats")
+      .then((catalog) => setVideos(new Set(catalog.matches.map((item) => item.date))))
+      .catch(() => setVideos(new Set()));
+  }, []);
 
   return (
     <List>
@@ -62,6 +73,9 @@ export function MatchBrowse({ matches, basePath }: { matches: MatchDetail[]; bas
                 {open ? "Ocultar detalhes" : "Ver detalhes"}
               </Toggle>
             : null}
+            {videos.has(match.playedOn) ? (
+              <VideoLink href={`/videos?jogo=${match.playedOn}`}>Ver vídeo</VideoLink>
+            ) : null}
             {open ? (
               <Detail>
                 {match.scheduled ? (
@@ -142,6 +156,17 @@ const Toggle = styled.button`
   &:focus-visible {
     outline: 2px solid ${({ theme }) => theme.purpleDeep};
     outline-offset: 3px;
+  }
+`;
+
+const VideoLink = styled(Link)`
+  display: inline-block;
+  margin: 0 12px 8px 0;
+  font-weight: 700;
+  color: ${({ theme }) => theme.purpleDeep};
+  &:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
   }
 `;
 

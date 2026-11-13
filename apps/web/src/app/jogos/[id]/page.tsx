@@ -1,9 +1,9 @@
 import { notFound } from "next/navigation";
 import { MatchAwards } from "@/components/MatchAwards";
-import { ApiError, api } from "@/lib/api";
+import { ApiError, api, loadFutStats } from "@/lib/api";
 import { awardsOpen } from "@/lib/awards";
 import { formatDiff, formatLongDate, resultLabel } from "@/lib/format";
-import { Kicker, Lineup, Muted, NameLink, PageBlock, PageTitle, Pill, PlayerLine, Scoreline, SideCard } from "@/styles/ui";
+import { ButtonLink, Kicker, Lineup, Muted, NameLink, PageBlock, PageTitle, Pill, PlayerLine, Scoreline, SideCard } from "@/styles/ui";
 import type { LinePlayer, MatchDetail } from "@/lib/types";
 
 function Team({ title, tone, players }: { title: string; tone: "a" | "b"; players: LinePlayer[] }) {
@@ -38,6 +38,8 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
     if (error instanceof ApiError && error.status === 404) notFound();
     throw error;
   }
+  const videos = await loadFutStats().catch(() => ({ matches: [] as { date: string }[] }));
+  const hasVideo = videos.matches.some((item) => item.date === match.playedOn);
   return (
     <PageBlock>
       <Kicker>{match.season.name}</Kicker>
@@ -48,6 +50,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
         {match.ownGoals ? `${match.ownGoals} gol contra. ` : ""}
         {match.origin === "planilha" ? "Registro importado da planilha." : "Lançado no painel."}
       </Muted>
+      {hasVideo ? <ButtonLink href={`/videos?jogo=${match.playedOn}`}>Ver vídeo</ButtonLink> : null}
       <Lineup>
         <Team title="Time A" tone="a" players={match.teamA} />
         <Team title="Time B" tone="b" players={match.teamB} />

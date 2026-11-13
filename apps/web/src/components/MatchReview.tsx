@@ -1,19 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { MatchAwards } from "@/components/MatchAwards";
 import { useSession } from "@/components/Session";
+import { clientApi } from "@/lib/client";
 import { awardsOpen } from "@/lib/awards";
 import { shareLineupImage } from "@/lib/lineup-image";
 import { formatLongDate } from "@/lib/format";
-import type { LinePlayer, MatchDetail } from "@/lib/types";
+import type { FutStatsCatalog, LinePlayer, MatchDetail } from "@/lib/types";
 import { Actions, ButtonLink, ErrorText, Lineup, Muted, PageTitle, Pill, PlayerLine, PrimaryButton, SideCard, Stack } from "@/styles/ui";
 
 export function MatchReview({ match }: { match: MatchDetail }) {
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
   const [sharing, setSharing] = useState(false);
+  const [hasVideo, setHasVideo] = useState(false);
   const player = useSession()?.role === "player";
+
+  useEffect(() => {
+    clientApi<FutStatsCatalog>("/futstats")
+      .then((catalog) => setHasVideo(catalog.matches.some((item) => item.date === match.playedOn)))
+      .catch(() => setHasVideo(false));
+  }, [match.playedOn]);
 
   async function share() {
     setError("");
@@ -59,6 +67,7 @@ export function MatchReview({ match }: { match: MatchDetail }) {
         <ButtonLink href={`/admin/jogo/${match.id}`} $variant={match.scheduled ? "ghost" : "primary"}>
           Editar
         </ButtonLink>
+        {hasVideo ? <ButtonLink href={`/videos?jogo=${match.playedOn}`} $variant="ghost">Ver vídeo</ButtonLink> : null}
       </Actions>}
     </Stack>
   );

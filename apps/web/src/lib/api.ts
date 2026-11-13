@@ -1,4 +1,4 @@
-import type { Attendance, MatchDetail, ScorerRow, Season, Standings } from "./types";
+import type { Attendance, FutStatsCatalog, MatchDetail, ScorerRow, Season, Standings } from "./types";
 
 const base = process.env.API_PROXY_URL || "http://127.0.0.1:3333";
 
@@ -37,4 +37,8 @@ export async function loadMatches(season?: string) {
 
 export async function loadAttendance(scope: string) {
   return api<Attendance>(`/attendance?scope=${scope}`);
+}
+
+export async function loadFutStats() {
+  return api<FutStatsCatalog>("/futstats");
 }

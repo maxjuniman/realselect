@@ -20,7 +20,7 @@ export default async function ScorersPage({ searchParams }: { searchParams: Prom
         <SeasonSelect seasons={seasons} value={table.season.code} path="/artilharia" />
       </PanelHead>
       <Rules>
-        Gols e assistências lançados por jogo. {scorers.ownGoals ? `${scorers.ownGoals} gols contra no semestre.` : ""}
+        Gols e assistências lançados por jogo, inclusive os importados do Fut Stats. {scorers.ownGoals ? `${scorers.ownGoals} gols contra no semestre.` : ""}
       </Rules>
       <TableWrap>
         <Table>

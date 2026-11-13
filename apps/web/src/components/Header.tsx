@@ -7,6 +7,7 @@ import styled from "styled-components";
 const links = [
   { href: "/", label: "Classificação" },
   { href: "/jogos", label: "Jogos" },
+  { href: "/videos", label: "Vídeos" },
   { href: "/historico", label: "Histórico" },
   { href: "/artilharia", label: "Artilharia" },
   { href: "/presenca", label: "Presença" },

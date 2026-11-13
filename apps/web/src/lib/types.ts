@@ -107,6 +107,11 @@ export type ScorerRow = {
   participations: number;
 };
 
+export type FutStatsCatalog = {
+  embed: string;
+  matches: { date: string; label: string; embed: string }[];
+};
+
 export type Attendance = {
   scope: string;
   label: string;

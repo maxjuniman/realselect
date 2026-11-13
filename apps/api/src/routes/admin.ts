@@ -9,6 +9,7 @@ import { prisma } from "../lib/prisma.js";
 import { professorRoster, saveAbsences, saveProfessorOrder, saveProfessorPlans } from "../lib/professors.js";
 import { sendTelegramText } from "../lib/telegram-lista.js";
 import { POSITIONS, SQUADS, cleanPositions } from "../lib/roster.js";
+import { importFutStats } from "../lib/futstats.js";
 import { listFees, saveFees } from "../lib/fees.js";
 import { saveRecords } from "../lib/records.js";
 import { shirtOwner } from "../lib/shirts.js";
@@ -580,6 +581,16 @@ export async function adminRoutes(app: FastifyInstance) {
     const saved = await saveFees(body.data.months);
     if (!saved.ok) return reply.code(400).send({ message: saved.error });
     return saved.fees;
+  });
+
+  app.post("/admin/futstats/import", async (request, reply) => {
+    const user = await requireUser(request, reply);
+    if (!user) return;
+    try {
+      return await importFutStats();
+    } catch (caught) {
+      return reply.code(400).send({ message: caught instanceof Error ? caught.message : "Não foi possível importar o Fut Stats." });
+    }
   });
 
   app.put("/admin/records", async (request, reply) => {
