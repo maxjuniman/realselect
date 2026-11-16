@@ -104,14 +104,38 @@ export async function listFutStats() {
   return matches;
 }
 
+function fingerprint(rows: { playerId: string | null; type: string; count: number }[]) {
+  return [...rows]
+    .map((row) => `${row.playerId ?? "own"}:${row.type}:${row.count}`)
+    .sort()
+    .join("|");
+}
+
+function summarize(rows: { playerId: string | null; type: string; count: number }[], names: Map<string, string>) {
+  const goals: string[] = [];
+  const assists: string[] = [];
+  const ordered = [...rows].sort((a, b) => (names.get(a.playerId ?? "") ?? "").localeCompare(names.get(b.playerId ?? "") ?? "", "pt-BR"));
+  for (const row of ordered) {
+    const name = row.playerId ? names.get(row.playerId) ?? "Jogador" : "Gol contra";
+    const label = row.count > 1 ? `${name} (${row.count})` : name;
+    if (row.type === "goal" || row.type === "own_goal") goals.push(label);
+    if (row.type === "assist") assists.push(label);
+  }
+  return { goals: goals.join(", ") || "ninguém", assists: assists.join(", ") || "ninguém" };
+}
+
 export async function importFutStats() {
   const catalog = await listFutStats();
   const players = await prisma.player.findMany({
     select: { id: true, name: true, nickname: true, shirtNumber: true },
   });
+  const names = new Map(players.map((player) => [player.id, player.name]));
   const report: {
     date: string;
     status: string;
+    changed: boolean;
+    before: { goals: string; assists: string };
+    after: { goals: string; assists: string };
     goals: number;
     assists: number;
     skipped: string[];
@@ -121,10 +145,19 @@ export async function importFutStats() {
     const playedOn = isoToDate(item.date);
     const match = await prisma.match.findFirst({
       where: { playedOn, scheduled: false },
-      include: { appearances: true },
+      include: { appearances: true, events: true },
     });
     if (!match) {
-      report.push({ date: item.date, status: "Sem jogo lançado nesta data.", goals: 0, assists: 0, skipped: [] });
+      report.push({
+        date: item.date,
+        status: "Sem jogo lançado nesta data.",
+        changed: false,
+        before: { goals: "—", assists: "—" },
+        after: { goals: "—", assists: "—" },
+        goals: 0,
+        assists: 0,
+        skipped: [],
+      });
       continue;
     }
     const pack = parseData(await pull(`/${item.date}/prototipo/data.js`));
@@ -174,25 +207,35 @@ export async function importFutStats() {
       }
     }
 
-    await prisma.$transaction(async (tx) => {
-      await tx.matchEvent.deleteMany({ where: { matchId: match.id, type: { in: ["goal", "assist", "own_goal"] } } });
-      if (tallies.size) {
-        await tx.matchEvent.createMany({
-          data: [...tallies.values()].map((event) => ({
-            matchId: match.id,
-            playerId: event.playerId,
-            type: event.type,
-            count: event.count,
-          })),
-        });
-      }
-    });
+    const incoming = [...tallies.values()];
+    const current = match.events
+      .filter((event) => event.type === "goal" || event.type === "assist" || event.type === "own_goal")
+      .map((event) => ({ playerId: event.playerId, type: event.type, count: event.count }));
+    const same = fingerprint(current) === fingerprint(incoming);
+    if (!same) {
+      await prisma.$transaction(async (tx) => {
+        await tx.matchEvent.deleteMany({ where: { matchId: match.id, type: { in: ["goal", "assist", "own_goal"] } } });
+        if (incoming.length) {
+          await tx.matchEvent.createMany({
+            data: incoming.map((event) => ({
+              matchId: match.id,
+              playerId: event.playerId,
+              type: event.type,
+              count: event.count,
+            })),
+          });
+        }
+      });
+    }
 
     report.push({
       date: item.date,
-      status: "Lançado",
-      goals: [...tallies.values()].filter((event) => event.type === "goal").reduce((sum, event) => sum + event.count, 0),
-      assists: [...tallies.values()].filter((event) => event.type === "assist").reduce((sum, event) => sum + event.count, 0),
+      status: same ? "Igual ao site" : current.length ? "Atualizado" : "Lançado",
+      changed: !same,
+      before: summarize(current, names),
+      after: summarize(incoming, names),
+      goals: incoming.filter((event) => event.type === "goal").reduce((sum, event) => sum + event.count, 0),
+      assists: incoming.filter((event) => event.type === "assist").reduce((sum, event) => sum + event.count, 0),
       skipped,
     });
   }

@@ -7,7 +7,7 @@ import styled from "styled-components";
 import { SessionProvider } from "@/components/Session";
 import { clientApi } from "@/lib/client";
 import type { Session } from "@/lib/types";
-import { AdminLink, AdminNav, AdminShell, GhostButton, Muted } from "@/styles/ui";
+import { AdminLink, AdminNav, AdminShell, GhostButton, Muted, NavBadge } from "@/styles/ui";
 
 const adminLinks = [
   { href: "/admin", label: "Resumo" },
@@ -38,6 +38,7 @@ export default function PainelLayout({ children }: { children: React.ReactNode }
   const router = useRouter();
   const pathname = usePathname();
   const [session, setSession] = useState<Session | null>(null);
+  const [pendingAccess, setPendingAccess] = useState(0);
 
   useEffect(() => {
     if (!localStorage.getItem("rs_token")) {
@@ -51,6 +52,13 @@ export default function PainelLayout({ children }: { children: React.ReactNode }
         router.replace("/admin/login");
       });
   }, [router]);
+
+  useEffect(() => {
+    if (!session || session.role !== "admin") return;
+    clientApi<{ pending: number }>("/admin/pending-access")
+      .then((data) => setPendingAccess(data.pending))
+      .catch(() => setPendingAccess(0));
+  }, [session, pathname]);
 
   const playerGame = pathname === "/admin/jogos" || (pathname.startsWith("/admin/jogos/") && !pathname.startsWith("/admin/jogos/novo"));
   const allowed =
@@ -86,6 +94,9 @@ export default function PainelLayout({ children }: { children: React.ReactNode }
             }
           >
             {link.label}
+            {link.href === "/admin/usuarios" && pendingAccess ? (
+              <NavBadge aria-label={`${pendingAccess} cadastro${pendingAccess > 1 ? "s" : ""} aguardando aprovação`}>{pendingAccess}</NavBadge>
+            ) : null}
           </AdminLink>
         ))}
         <GhostButton

@@ -36,6 +36,20 @@ function named(players: LinePlayer[], field: "goals" | "assists") {
     .join(", ");
 }
 
+function TeamLines({ tone, players }: { tone: "verde" | "roxo"; players: LinePlayer[] }) {
+  return (
+    <TeamBlock $tone={tone}>
+      <strong>{tone === "verde" ? "Verde" : "Roxo"}</strong>
+      <p>
+        <b>Gols.</b> {named(players, "goals") || "ninguém"}
+      </p>
+      <p>
+        <b>Assistências.</b> {named(players, "assists") || "ninguém"}
+      </p>
+    </TeamBlock>
+  );
+}
+
 export function MatchBrowse({ matches, basePath }: { matches: MatchDetail[]; basePath: "/jogos" | "/admin/jogos" }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const [videos, setVideos] = useState<Set<string>>(new Set());
@@ -64,6 +78,7 @@ export function MatchBrowse({ matches, basePath }: { matches: MatchDetail[]; bas
               : "Sem professor"
             : `${match.teamA.length} x ${match.teamB.length}`;
         const when = admin ? formatTinyDate(match.playedOn) : formatLongDate(match.playedOn);
+        const scored = match.scheduled || Boolean(goals);
         return (
           <Item key={match.id}>
             <Row>
@@ -77,8 +92,15 @@ export function MatchBrowse({ matches, basePath }: { matches: MatchDetail[]; bas
                     <PlayIcon />
                   </IconLink>
                 ) : null}
-                <IconButton type="button" aria-expanded={open} aria-label={open ? `Ocultar detalhes do jogo ${when}` : `Detalhes do jogo ${when}`} onClick={() => setOpenId(open ? null : match.id)}>
+                <IconButton
+                  type="button"
+                  $empty={!scored}
+                  aria-expanded={open}
+                  aria-label={open ? `Ocultar detalhes do jogo ${when}` : scored ? `Detalhes do jogo ${when}` : `Detalhes do jogo ${when}, sem gols`}
+                  onClick={() => setOpenId(open ? null : match.id)}
+                >
                   <ListIcon />
+                  {scored ? null : <EmptyMark aria-hidden="true" />}
                 </IconButton>
               </Tools>
             </Row>
@@ -88,12 +110,11 @@ export function MatchBrowse({ matches, basePath }: { matches: MatchDetail[]; bas
                   <Muted>Esse jogo ainda não foi lançado.</Muted>
                 ) : (
                   <>
-                    <p>
-                      <b>Gols.</b> {goals || "ninguém"}
-                    </p>
-                    <p>
-                      <b>Assistências.</b> {assists || "ninguém"}
-                    </p>
+                    <Teams>
+                      <TeamLines tone="verde" players={match.colorA === "roxo" ? match.teamB : match.teamA} />
+                      <TeamLines tone="roxo" players={match.colorA === "roxo" ? match.teamA : match.teamB} />
+                    </Teams>
+                    {match.ownGoals ? <Muted>{match.ownGoals === 1 ? "1 gol contra." : `${match.ownGoals} gols contra.`}</Muted> : null}
                   </>
                 )}
               </Detail>
@@ -192,18 +213,19 @@ const IconLink = styled(Link)`
   }
 `;
 
-const IconButton = styled.button`
+const IconButton = styled.button<{ $empty?: boolean }>`
+  position: relative;
   width: 40px;
   height: 40px;
   padding: 0;
-  border: 0;
+  border: ${({ $empty, theme }) => ($empty ? `2px solid ${theme.purple}` : "0")};
   display: grid;
   place-items: center;
-  background: ${({ theme }) => theme.purple};
-  color: white;
+  background: ${({ $empty, theme }) => ($empty ? theme.card : theme.purple)};
+  color: ${({ $empty, theme }) => ($empty ? theme.purple : "white")};
   cursor: pointer;
   &:hover {
-    background: ${({ theme }) => theme.purpleDeep};
+    background: ${({ $empty, theme }) => ($empty ? theme.paper : theme.purpleDeep)};
   }
   &:focus-visible {
     outline: 2px solid ${({ theme }) => theme.purpleDeep};
@@ -211,15 +233,47 @@ const IconButton = styled.button`
   }
 `;
 
+const EmptyMark = styled.span`
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 8px;
+  height: 8px;
+  background: ${({ theme }) => theme.loss};
+`;
+
 const Detail = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 10px;
   padding: 0 0 12px;
   p {
     margin: 0;
   }
   b {
     font-weight: 700;
+  }
+`;
+
+const Teams = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 24px;
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const TeamBlock = styled.div<{ $tone: "verde" | "roxo" }>`
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 10px;
+  box-shadow: inset 3px 0 0 ${({ $tone, theme }) => ($tone === "verde" ? "#008000" : theme.purple)};
+  strong {
+    color: ${({ $tone, theme }) => ($tone === "verde" ? "#008000" : theme.purple)};
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 12px;
   }
 `;

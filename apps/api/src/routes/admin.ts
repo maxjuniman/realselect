@@ -249,6 +249,13 @@ export async function adminRoutes(app: FastifyInstance) {
     }
   });
 
+  app.get("/admin/pending-access", async (request, reply) => {
+    const user = await requireUser(request, reply);
+    if (!user) return;
+    const pending = await prisma.playerAccount.count({ where: { access: "pending" } });
+    return { pending };
+  });
+
   app.get("/admin/player-access", async (request, reply) => {
     const user = await requireUser(request, reply);
     if (!user) return;

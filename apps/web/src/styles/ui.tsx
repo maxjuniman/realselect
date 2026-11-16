@@ -1129,6 +1129,9 @@ export const AdminNav = styled.aside`
 `;
 
 export const AdminLink = styled(Link)<{ $active?: boolean }>`
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 8px 0 8px 12px;
   border-radius: 0;
   font-weight: ${({ $active }) => ($active ? 700 : 500)};
@@ -1137,6 +1140,19 @@ export const AdminLink = styled(Link)<{ $active?: boolean }>`
   &:hover {
     color: ${({ theme }) => theme.purpleDeep};
   }
+`;
+
+export const NavBadge = styled.span`
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: grid;
+  place-items: center;
+  background: ${({ theme }) => theme.gold};
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
 `;
 
 export const Picker = styled.div`
