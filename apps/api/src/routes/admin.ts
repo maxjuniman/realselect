@@ -593,8 +593,29 @@ export async function adminRoutes(app: FastifyInstance) {
   app.post("/admin/futstats/import", async (request, reply) => {
     const user = await requireUser(request, reply);
     if (!user) return;
+    const body = z
+      .object({
+        annotations: z
+          .array(
+            z.object({
+              match: z.string().optional(),
+              goals: z
+                .array(
+                  z.object({
+                    event_id: z.string().optional(),
+                    id: z.string().optional(),
+                    autor: z.string().optional(),
+                    assist: z.string().optional(),
+                  }),
+                )
+                .optional(),
+            }),
+          )
+          .optional(),
+      })
+      .safeParse(request.body ?? {});
     try {
-      return await importFutStats();
+      return await importFutStats(body.success ? body.data.annotations ?? [] : []);
     } catch (caught) {
       return reply.code(400).send({ message: caught instanceof Error ? caught.message : "Não foi possível importar o Fut Stats." });
     }

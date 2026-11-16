@@ -6,8 +6,14 @@ export const FUTSTATS_KEY = process.env.FUTSTATS_KEY || "MmUsx9n9jRPRTwZRsG9Mf-C
 
 type FsGoal = {
   id: string;
+  team?: string;
   note?: string;
-  human?: { autor?: string; assist?: string };
+  human?: { autor?: string; assist?: string; tag?: string };
+};
+
+export type FutStatsAnnotation = {
+  match?: string;
+  goals?: { event_id?: string; id?: string; autor?: string; assist?: string }[];
 };
 type FsRoster = { id: string; name: string; number: string };
 type FsEvent = { type: string; outcome?: string; player?: string | null };
@@ -124,7 +130,27 @@ function summarize(rows: { playerId: string | null; type: string; count: number 
   return { goals: goals.join(", ") || "ninguém", assists: assists.join(", ") || "ninguém" };
 }
 
-export async function importFutStats() {
+function annotationMap(packs: FutStatsAnnotation[], date: string) {
+  const hit = packs.find((pack) => pack.match === date);
+  return new Map((hit?.goals ?? []).map((goal) => [goal.event_id || goal.id || "", goal]));
+}
+
+function applyNotes(goals: FsGoal[], notes: ReturnType<typeof annotationMap>) {
+  return goals.map((goal) => {
+    const note = notes.get(goal.id);
+    if (!note) return goal;
+    return {
+      ...goal,
+      human: {
+        ...goal.human,
+        autor: blank(note.autor) || goal.human?.autor || "",
+        assist: note.assist !== undefined ? blank(note.assist) : goal.human?.assist,
+      },
+    };
+  });
+}
+
+export async function importFutStats(annotations: FutStatsAnnotation[] = []) {
   const catalog = await listFutStats();
   const players = await prisma.player.findMany({
     select: { id: true, name: true, nickname: true, shirtNumber: true },
@@ -139,6 +165,8 @@ export async function importFutStats() {
     goals: number;
     assists: number;
     skipped: string[];
+    lances: { id: string; team: string; autor: string; assist: string }[];
+    annotated: boolean;
   }[] = [];
 
   for (const item of catalog) {
@@ -157,10 +185,13 @@ export async function importFutStats() {
         goals: 0,
         assists: 0,
         skipped: [],
+        lances: [],
+        annotated: false,
       });
       continue;
     }
     const pack = parseData(await pull(`/${item.date}/prototipo/data.js`));
+    const notes = annotationMap(annotations, item.date);
     const roster = new Map((pack.roster_seed ?? []).map((row) => [row.id, row]));
     const inMatch = new Set(match.appearances.map((row) => row.playerId));
     const tallies = new Map<string, { playerId: string | null; type: "goal" | "assist" | "own_goal"; count: number }>();
@@ -186,7 +217,7 @@ export async function importFutStats() {
       return player;
     }
 
-    const goals = pack.goals ?? [];
+    const goals = applyNotes(pack.goals ?? [], notes);
     if (goals.length) {
       for (const goal of goals) {
         const scorer = take(goal.human?.autor ?? "", shirtFromNote(goal.note, "Autor"), "gol");
@@ -237,6 +268,13 @@ export async function importFutStats() {
       goals: incoming.filter((event) => event.type === "goal").reduce((sum, event) => sum + event.count, 0),
       assists: incoming.filter((event) => event.type === "assist").reduce((sum, event) => sum + event.count, 0),
       skipped,
+      lances: goals.map((goal) => ({
+        id: goal.id,
+        team: goal.team ?? "",
+        autor: goal.human?.autor || "—",
+        assist: goal.human?.assist || "—",
+      })),
+      annotated: notes.size > 0,
     });
   }
 

@@ -15,6 +15,8 @@ export type ImportRow = {
   goals: number;
   assists: number;
   skipped: string[];
+  lances: { id: string; team: string; autor: string; assist: string }[];
+  annotated: boolean;
 };
 
 export function ImportFutStats() {
@@ -23,6 +25,8 @@ export function ImportFutStats() {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
   const [rows, setRows] = useState<ImportRow[] | null>(null);
+  const [notes, setNotes] = useState<unknown[]>([]);
+  const [notesName, setNotesName] = useState("");
 
   useEffect(() => {
     if (!open) return;
@@ -33,13 +37,39 @@ export function ImportFutStats() {
     return () => window.removeEventListener("keydown", onKey);
   }, [open, busy]);
 
+  async function onNotes(files: FileList | null) {
+    if (!files?.length) {
+      setNotes([]);
+      setNotesName("");
+      return;
+    }
+    try {
+      const parsed: unknown[] = [];
+      for (const file of files) {
+        const json = JSON.parse(await file.text()) as unknown;
+        if (Array.isArray(json)) parsed.push(...json);
+        else parsed.push(json);
+      }
+      setNotes(parsed);
+      setNotesName([...files].map((file) => file.name).join(", "));
+      setError("");
+    } catch {
+      setNotes([]);
+      setNotesName("");
+      setError("Esse arquivo de anotações não é um JSON válido.");
+    }
+  }
+
   async function run() {
     setBusy(true);
     setError("");
     setRows(null);
     setOpen(true);
     try {
-      const saved = await clientApi<{ report: ImportRow[] }>("/admin/futstats/import", { method: "POST", body: JSON.stringify({}) });
+      const saved = await clientApi<{ report: ImportRow[] }>("/admin/futstats/import", {
+        method: "POST",
+        body: JSON.stringify({ annotations: notes }),
+      });
       setRows(saved.report);
       if (saved.report.some((row) => row.changed)) router.refresh();
     } catch (caught) {
@@ -53,9 +83,16 @@ export function ImportFutStats() {
 
   return (
     <>
-      <GhostButton type="button" disabled={busy} onClick={() => void run()}>
-        {busy ? "Importando..." : "Importar gols do Fut Stats"}
-      </GhostButton>
+      <Actions>
+        <FileLabel>
+          <input type="file" accept="application/json,.json" multiple onChange={(event) => void onNotes(event.target.files)} />
+          Anexar anotações
+        </FileLabel>
+        <GhostButton type="button" disabled={busy} onClick={() => void run()}>
+          {busy ? "Importando..." : "Importar gols do Fut Stats"}
+        </GhostButton>
+      </Actions>
+      {notesName ? <Muted>Anotações: {notesName}</Muted> : null}
       {open ? (
         <Backdrop onClick={() => !busy && setOpen(false)}>
           <Dialog role="dialog" aria-label="Comparativo da importação" onClick={(event) => event.stopPropagation()}>
@@ -67,7 +104,10 @@ export function ImportFutStats() {
                 <Muted>
                   {changed
                     ? `${changed} jogo(s) estavam diferentes do site e foram atualizados.`
-                    : "Nada mudou: o que está no site já bate com o Fut Stats."}
+                    : "Nada mudou: o que está no site já bate com o arquivo publicado do Fut Stats."}
+                </Muted>
+                <Muted>
+                  Correções feitas na tela de revisão do Fut Stats ficam só no navegador. Para importar o que você validou, use Exportar anotações e anexe o JSON.
                 </Muted>
                 <TableWrap>
                   <Table>
@@ -83,7 +123,10 @@ export function ImportFutStats() {
                       {rows.map((row) => (
                         <tr key={row.date}>
                           <Td $name>{row.date.split("-").reverse().join("/")}</Td>
-                          <Td>{row.status}</Td>
+                          <Td>
+                            {row.status}
+                            {row.annotated ? <Muted> · com anotações</Muted> : null}
+                          </Td>
                           <Td>
                             {row.before.goals}
                             <Muted> · {row.before.assists}</Muted>
@@ -92,6 +135,16 @@ export function ImportFutStats() {
                             {row.after.goals}
                             <Muted> · {row.after.assists}</Muted>
                             {row.skipped.length ? <Muted> · {row.skipped.join("; ")}</Muted> : null}
+                            {row.lances.length ? (
+                              <LanceList>
+                                {row.lances.map((lance) => (
+                                  <li key={lance.id}>
+                                    {lance.id} {lance.team} {lance.autor}
+                                    {lance.assist && lance.assist !== "—" ? ` · ${lance.assist}` : ""}
+                                  </li>
+                                ))}
+                              </LanceList>
+                            ) : null}
                           </Td>
                         </tr>
                       ))}
@@ -109,6 +162,47 @@ export function ImportFutStats() {
     </>
   );
 }
+
+const Actions = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+`;
+
+const FileLabel = styled.label`
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid ${({ theme }) => theme.line};
+  background: ${({ theme }) => theme.card};
+  color: ${({ theme }) => theme.ink};
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+  &:hover {
+    color: ${({ theme }) => theme.purpleDeep};
+  }
+`;
+
+const LanceList = styled.ul`
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: ${({ theme }) => theme.muted};
+  font-size: 13px;
+`;
 
 const Backdrop = styled.div`
   position: fixed;
