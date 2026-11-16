@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { MatchAwards } from "@/components/MatchAwards";
+import { MatchEventsEdit } from "@/components/MatchEventsEdit";
 import { useSession } from "@/components/Session";
 import { clientApi } from "@/lib/client";
 import { awardsOpen } from "@/lib/awards";
@@ -64,6 +65,7 @@ export function MatchReview({ match }: { match: MatchDetail }) {
             {sharing ? "Gerando imagem..." : "Compartilhar no WhatsApp"}
           </PrimaryButton>
         ) : null}
+        {match.scheduled ? null : <MatchEventsEdit match={match} />}
         <ButtonLink href={`/admin/jogo/${match.id}`} $variant={match.scheduled ? "ghost" : "primary"}>
           Editar
         </ButtonLink>

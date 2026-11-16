@@ -6,6 +6,7 @@ import styled from "styled-components";
 import { ImportFutStats } from "@/components/ImportFutStats";
 import { LaunchList } from "@/components/LaunchList";
 import { MatchAwards } from "@/components/MatchAwards";
+import { MatchEventsEdit } from "@/components/MatchEventsEdit";
 import { useSession } from "@/components/Session";
 import { clientApi } from "@/lib/client";
 import { awardsOpen } from "@/lib/awards";
@@ -115,6 +116,7 @@ export function MatchBrowse({ matches, basePath }: { matches: MatchDetail[]; bas
                       <TeamLines tone="roxo" players={match.colorA === "roxo" ? match.teamA : match.teamB} />
                     </Teams>
                     {match.ownGoals ? <Muted>{match.ownGoals === 1 ? "1 gol contra." : `${match.ownGoals} gols contra.`}</Muted> : null}
+                    {organizer ? <MatchEventsEdit match={match} /> : null}
                   </>
                 )}
               </Detail>

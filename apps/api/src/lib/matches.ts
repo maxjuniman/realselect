@@ -15,6 +15,10 @@ const eventSchema = z.object({
   count: z.number().int().positive().max(30),
 });
 
+export const matchEventsSchema = z.object({
+  events: z.array(eventSchema).max(80),
+});
+
 export const matchInputSchema = z.object({
   playedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   seasonCode: z.string().min(4).max(20),
@@ -143,6 +147,45 @@ export async function saveMatch(input: MatchInput, matchId?: string): Promise<Sa
   });
 
   return { ok: true, match };
+}
+
+export async function saveMatchEvents(matchId: string, events: z.infer<typeof eventSchema>[]) {
+  const match = await prisma.match.findUnique({
+    where: { id: matchId },
+    include: { appearances: true },
+  });
+  if (!match) return { ok: false as const, error: "Jogo não encontrado.", status: 404 as const };
+  if (match.scheduled) return { ok: false as const, error: "Lance o jogo antes de editar os gols.", status: 400 as const };
+
+  const inMatch = new Set(match.appearances.map((row) => row.playerId));
+  const merged = new Map<string, { playerId: string | null; type: string; count: number }>();
+  for (const event of events) {
+    if (event.type !== "own_goal" && (!event.playerId || !inMatch.has(event.playerId))) {
+      return { ok: false as const, error: "Gols e assistências precisam ser de quem jogou.", status: 400 as const };
+    }
+    const playerId = event.type === "own_goal" ? null : event.playerId ?? null;
+    const key = `${playerId ?? "own"}:${event.type}`;
+    const current = merged.get(key) ?? { playerId, type: event.type, count: 0 };
+    current.count += event.count;
+    merged.set(key, current);
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.matchEvent.deleteMany({ where: { matchId, type: { in: ["goal", "assist", "own_goal"] } } });
+    if (merged.size) {
+      await tx.matchEvent.createMany({
+        data: [...merged.values()].map((event) => ({
+          matchId,
+          playerId: event.playerId,
+          type: event.type,
+          count: event.count,
+        })),
+      });
+    }
+  });
+
+  const saved = await prisma.match.findUniqueOrThrow({ where: { id: matchId }, include: matchInclude });
+  return { ok: true as const, match: presentMatch(saved) };
 }
 
 type MatchWithRelations = Match & {

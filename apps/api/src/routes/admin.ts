@@ -3,7 +3,7 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { createUser, hashPassword, login, loginPlayer, readSession, requireSession, requireUser } from "../lib/auth.js";
 import { dateToIso, isoToDate, seasonFromCode } from "../lib/dates.js";
-import { matchInclude, matchInputSchema, presentMatch, saveMatch } from "../lib/matches.js";
+import { matchEventsSchema, matchInclude, matchInputSchema, presentMatch, saveMatch, saveMatchEvents } from "../lib/matches.js";
 import { removePhoto, savePhoto } from "../lib/photos.js";
 import { prisma } from "../lib/prisma.js";
 import { professorRoster, saveAbsences, saveProfessorOrder, saveProfessorPlans } from "../lib/professors.js";
@@ -423,6 +423,16 @@ export async function adminRoutes(app: FastifyInstance) {
     if (!saved.ok) return reply.code(saved.status).send({ message: saved.error });
     const match = await prisma.match.findUniqueOrThrow({ where: { id: saved.match.id }, include: matchInclude });
     return presentMatch(match);
+  });
+
+  app.patch<{ Params: { id: string } }>("/admin/matches/:id/events", async (request, reply) => {
+    const user = await requireUser(request, reply);
+    if (!user) return;
+    const body = matchEventsSchema.safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ message: "Confira os gols e as assistências." });
+    const saved = await saveMatchEvents(request.params.id, body.data.events);
+    if (!saved.ok) return reply.code(saved.status).send({ message: saved.error });
+    return saved.match;
   });
 
   app.patch<{ Params: { id: string } }>("/admin/matches/:id", async (request, reply) => {
