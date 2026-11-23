@@ -261,8 +261,8 @@ export function buildCallList(players: PlayerRef[], matches: MatchDetail[], opti
       .map((player, index) => {
         if (player.injured) return `${index + 1}. `;
         const row = marks.get(player.id);
-        const position = player.positions?.[0];
-        const place = position ? ` (${position})` : "";
+        const positions = player.positions?.filter(Boolean) ?? [];
+        const place = positions.length ? ` (${positions.join("/")})` : "";
         const count = row ? ` ${row.last10}/10` : "";
         const mark = meat ? " 🍖" : "";
         return `${index + 1}. ${player.name}${place}${count}${mark}`;

@@ -12,6 +12,7 @@ import { AdminLink, AdminNav, AdminShell, GhostButton, Muted, NavBadge } from "@
 const adminLinks = [
   { href: "/admin", label: "Resumo" },
   { href: "/admin/jogos", label: "Jogos" },
+  { href: "/admin/artilharia", label: "Artilharia" },
   { href: "/admin/votacao", label: "Votação" },
   { href: "/admin/jogadores", label: "Jogadores" },
   { href: "/admin/professores", label: "Professores" },
@@ -26,6 +27,7 @@ const adminLinks = [
 const playerLinks = [
   { href: "/admin", label: "Resumo" },
   { href: "/admin/jogos", label: "Jogos" },
+  { href: "/admin/artilharia", label: "Artilharia" },
   { href: "/admin/jogadores", label: "Jogadores" },
   { href: "/admin/financeiro", label: "Financeiro" },
 ];
@@ -65,6 +67,7 @@ export default function PainelLayout({ children }: { children: React.ReactNode }
     !session ||
     session.role !== "player" ||
     pathname === "/admin" ||
+    pathname.startsWith("/admin/artilharia") ||
     pathname.startsWith("/admin/jogadores") ||
     pathname.startsWith("/admin/financeiro") ||
     playerGame;

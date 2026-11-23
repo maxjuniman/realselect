@@ -17,6 +17,7 @@ const tabs: { id: Tab; label: string }[] = [
 
 function Ranking({ rows, label }: { rows: ScorerRow[]; label: "Gols" | "Assistências" }) {
   if (!rows.length) return <Empty>Ninguém nesta temporada.</Empty>;
+  const total = rows.reduce((sum, row) => sum + (label === "Gols" ? row.goals : row.assists), 0);
   return (
     <TableWrap>
       <Table>
@@ -24,7 +25,7 @@ function Ranking({ rows, label }: { rows: ScorerRow[]; label: "Gols" | "Assistê
           <tr>
             <Th>#</Th>
             <Th>Jogador</Th>
-            <Th $num>{label}</Th>
+            <Th $num>{label} ({total})</Th>
           </tr>
         </thead>
         <tbody>

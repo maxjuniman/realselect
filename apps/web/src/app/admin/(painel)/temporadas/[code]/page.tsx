@@ -107,9 +107,9 @@ export default function SeasonDataPage() {
                   <tr>
                     <Th>#</Th>
                     <Th>Jogador</Th>
-                    <Th $num>Gols</Th>
-                    <Th $num>Assist.</Th>
-                    <Th $num>Participações</Th>
+                    <Th $num>Gols ({scorers.rows.reduce((sum, row) => sum + row.goals, 0)})</Th>
+                    <Th $num>Assist. ({scorers.rows.reduce((sum, row) => sum + row.assists, 0)})</Th>
+                    <Th $num>Participações ({scorers.rows.reduce((sum, row) => sum + row.participations, 0)})</Th>
                   </tr>
                 </thead>
                 <tbody>

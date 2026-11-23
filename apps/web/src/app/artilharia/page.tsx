@@ -12,6 +12,9 @@ export default async function ScorersPage({ searchParams }: { searchParams: Prom
   const scorers = await api<{ season: Season; ownGoals: number; rows: ScorerRow[] }>(
     `/scorers?season=${encodeURIComponent(table.season.code)}`,
   );
+  const goals = scorers.rows.reduce((sum, row) => sum + row.goals, 0);
+  const assists = scorers.rows.reduce((sum, row) => sum + row.assists, 0);
+  const participations = scorers.rows.reduce((sum, row) => sum + row.participations, 0);
 
   return (
     <Panel $top>
@@ -28,9 +31,9 @@ export default async function ScorersPage({ searchParams }: { searchParams: Prom
             <tr>
               <Th>#</Th>
               <Th>Jogador</Th>
-              <Th $num>Gols</Th>
-              <Th $num>Assist.</Th>
-              <Th $num>Participações</Th>
+              <Th $num>Gols ({goals})</Th>
+              <Th $num>Assist. ({assists})</Th>
+              <Th $num>Participações ({participations})</Th>
             </tr>
           </thead>
           <tbody>
