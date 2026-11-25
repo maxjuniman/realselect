@@ -202,6 +202,25 @@ export async function adminRoutes(app: FastifyInstance) {
     return presentPlayer(saved);
   });
 
+  app.delete<{ Params: { id: string } }>("/admin/players/:id", async (request, reply) => {
+    const user = await requireUser(request, reply);
+    if (!user) return;
+    const player = await prisma.player.findUnique({ where: { id: request.params.id } });
+    if (!player || player.name === "Gol contra") return reply.code(404).send({ message: "Jogador não encontrado." });
+    try {
+      await prisma.$transaction([
+        prisma.match.updateMany({ where: { professorId: player.id }, data: { professorId: null } }),
+        prisma.matchEvent.deleteMany({ where: { playerId: player.id } }),
+        prisma.matchAppearance.deleteMany({ where: { playerId: player.id } }),
+        prisma.player.delete({ where: { id: player.id } }),
+      ]);
+    } catch {
+      return reply.code(400).send({ message: "Não foi possível excluir o jogador." });
+    }
+    await removePhoto(player.photo);
+    return { ok: true };
+  });
+
   app.patch<{ Params: { id: string } }>("/admin/players/:id", { bodyLimit: 2_000_000 }, async (request, reply) => {
     const user = await requireUser(request, reply);
     if (!user) return;

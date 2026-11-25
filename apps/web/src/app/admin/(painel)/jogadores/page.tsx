@@ -7,7 +7,7 @@ import { clientApi } from "@/lib/client";
 import { photoUrl, shrinkPhoto } from "@/lib/photo";
 import { GROUPS, POSITIONS, positionRank, type GroupId } from "@/lib/roster";
 import type { PlayerRef } from "@/lib/types";
-import { ErrorText, Field, Muted, PageTitle, PanelHead, PrimaryButton, Search, Select, Stack, TextInput } from "@/styles/ui";
+import { Actions, DangerButton, ErrorText, Field, GhostButton, Muted, PageTitle, PanelHead, PrimaryButton, Search, Select, Stack, TextInput } from "@/styles/ui";
 
 function foldName(value: string) {
   return value.trim().toLocaleLowerCase("pt-BR").normalize("NFD").replace(/\p{M}/gu, "");
@@ -57,6 +57,8 @@ export default function PlayersAdminPage() {
     inativo: false,
   });
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [removing, setRemoving] = useState<PlayerRef | null>(null);
+  const [removingBusy, setRemovingBusy] = useState(false);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const photoRef = useRef<HTMLInputElement>(null);
@@ -156,6 +158,21 @@ export default function PlayersAdminPage() {
       await load();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Não foi possível marcar o jogador.");
+    }
+  }
+
+  async function remove(player: PlayerRef) {
+    setError("");
+    setRemovingBusy(true);
+    try {
+      await clientApi(`/admin/players/${player.id}`, { method: "DELETE" });
+      if (draft?.id === player.id) setDraft(null);
+      setRemoving(null);
+      await load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Não foi possível excluir o jogador.");
+    } finally {
+      setRemovingBusy(false);
     }
   }
 
@@ -272,6 +289,9 @@ export default function PlayersAdminPage() {
                                   <GroupIcon group={option.id} />
                                 </IconButton>
                               ))}
+                              <DeleteButton type="button" aria-label={`Excluir ${player.name}`} title="Excluir" onClick={() => { setError(""); setRemoving(player); }}>
+                                <TrashIcon />
+                              </DeleteButton>
                             </>
                           )}
                         </Tools>
@@ -286,6 +306,24 @@ export default function PlayersAdminPage() {
           </Group>
         ))}
       </Groups>
+
+      {removing ? (
+        <ConfirmBackdrop onMouseDown={() => { if (!removingBusy) setRemoving(null); }}>
+          <ConfirmDialog role="dialog" aria-modal="true" aria-labelledby="remove-player-title" onMouseDown={(event) => event.stopPropagation()}>
+            <h2 id="remove-player-title">Excluir {removing.name}?</h2>
+            <Muted>Ele sai da listagem. Se entrou em algum jogo, sai da escalação, dos gols e das assistências.</Muted>
+            {error ? <ErrorText>{error}</ErrorText> : null}
+            <Actions>
+              <GhostButton type="button" disabled={removingBusy} onClick={() => setRemoving(null)}>
+                Cancelar
+              </GhostButton>
+              <DangerButton type="button" disabled={removingBusy} onClick={() => remove(removing)}>
+                {removingBusy ? "Excluindo..." : "Excluir"}
+              </DangerButton>
+            </Actions>
+          </ConfirmDialog>
+        </ConfirmBackdrop>
+      ) : null}
 
       {draft ? (
         <Backdrop onMouseDown={() => setDraft(null)}>
@@ -412,6 +450,14 @@ function PlusIcon() {
   );
 }
 
+function TrashIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M5 7h14M9 7V5h6v2M8 7l1 13h6l1-13" fill="none" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
 function CloseIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
@@ -508,6 +554,25 @@ const HurtButton = styled.button<{ $on: boolean }>`
   padding: 0;
   background: transparent;
   color: ${({ $on, theme }) => ($on ? theme.loss : theme.ink)};
+  cursor: pointer;
+  &:hover {
+    color: ${({ theme }) => theme.loss};
+  }
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.purpleDeep};
+    outline-offset: 2px;
+  }
+`;
+
+const DeleteButton = styled.button`
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: ${({ theme }) => theme.ink};
   cursor: pointer;
   &:hover {
     color: ${({ theme }) => theme.loss};
@@ -697,6 +762,28 @@ const Backdrop = styled.div`
   place-items: center;
   padding: 20px;
   background: rgba(28, 16, 34, 0.46);
+`;
+
+const ConfirmBackdrop = styled(Backdrop)`
+  z-index: 40;
+`;
+
+const ConfirmDialog = styled.div`
+  width: min(420px, 100%);
+  background: ${({ theme }) => theme.paper};
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  h2 {
+    margin: 0;
+    font-family: ${({ theme }) => theme.display};
+    font-stretch: 87.5%;
+    font-weight: 700;
+    font-size: 36px;
+    letter-spacing: -0.03em;
+    line-height: 0.95;
+  }
 `;
 
 const Dialog = styled.form`
