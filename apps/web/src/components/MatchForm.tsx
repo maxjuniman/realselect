@@ -106,7 +106,7 @@ export function MatchForm({
   }, [signup]);
 
   const missingNames = useMemo(() => {
-    const parsed = parseTeamList(listText, roster.filter((player) => player.active !== false), { verde: 0, roxo: 0 });
+    const parsed = parseTeamList(listText, roster, { verde: 0, roxo: 0 });
     return parsed.ok ? [] : [...new Set(parsed.missing)];
   }, [listText, roster]);
 
@@ -152,8 +152,7 @@ export function MatchForm({
       setListError("Informe o placar do verde e do roxo.");
       return;
     }
-    const activePlayers = roster.filter((player) => player.active !== false);
-    const parsed = parseTeamList(listText, activePlayers, { verde, roxo });
+    const parsed = parseTeamList(listText, roster, { verde, roxo });
     if (!parsed.ok) {
       setListError(parsed.message);
       return;
@@ -174,6 +173,37 @@ export function MatchForm({
   function openSignup(token: string) {
     setSignupError("");
     setSignup({ token, name: token, nickname: "", group: "suplente", first: "", second: "" });
+  }
+
+  function keepPlayer(player: PlayerRef, token: string, people: PlayerRef[]) {
+    const byId = new Map(people.map((item) => [item.id, item]));
+    byId.set(player.id, player);
+    const nextRoster = [...byId.values()];
+    const matchesToken = foldLabel(player.name) === foldLabel(token) || foldLabel(player.nickname ?? "") === foldLabel(token);
+    const nextText = matchesToken
+      ? listText
+      : listText
+          .split(/\r?\n/)
+          .map((line) => (line.trim() === token ? player.name : line))
+          .join("\n");
+    setRoster(nextRoster);
+    if (nextText !== listText) setListText(nextText);
+    setSignup(null);
+    const verdeText = verdeScore.trim();
+    const roxoText = roxoScore.trim();
+    if (/^\d{1,2}$/.test(verdeText) && /^\d{1,2}$/.test(roxoText)) {
+      const still = parseTeamList(nextText, nextRoster, { verde: Number(verdeText), roxo: Number(roxoText) });
+      setListError(still.ok ? "" : still.message);
+    }
+  }
+
+  async function existingPlayer(name: string) {
+    const everyone = await clientApi<PlayerRef[]>("/players");
+    const key = foldLabel(name);
+    return {
+      everyone,
+      player: everyone.find((player) => foldLabel(player.name) === key || foldLabel(player.nickname ?? "") === key),
+    };
   }
 
   async function registerPlayer(event: FormEvent) {
@@ -200,28 +230,22 @@ export function MatchForm({
           squad: signup.group,
         }),
       });
-      const nextRoster = [...roster.filter((player) => player.id !== created.id), created];
-      const matchesToken = foldLabel(created.name) === foldLabel(token) || foldLabel(created.nickname ?? "") === foldLabel(token);
-      const nextText = matchesToken
-        ? listText
-        : listText
-            .split(/\r?\n/)
-            .map((line) => (line.trim() === token ? created.name : line))
-            .join("\n");
-      setRoster(nextRoster);
-      if (nextText !== listText) setListText(nextText);
-      setSignup(null);
-      const verdeText = verdeScore.trim();
-      const roxoText = roxoScore.trim();
-      if (/^\d{1,2}$/.test(verdeText) && /^\d{1,2}$/.test(roxoText)) {
-        const still = parseTeamList(nextText, nextRoster.filter((player) => player.active !== false), {
-          verde: Number(verdeText),
-          roxo: Number(roxoText),
-        });
-        setListError(still.ok ? "" : still.message);
-      }
+      keepPlayer(created, token, roster);
     } catch (caught) {
-      setSignupError(caught instanceof Error ? caught.message : "Não foi possível cadastrar.");
+      const message = caught instanceof Error ? caught.message : "Não foi possível cadastrar.";
+      if (message.toLocaleLowerCase("pt-BR").includes("já existe")) {
+        try {
+          const found = await existingPlayer(name);
+          if (found.player) {
+            keepPlayer(found.player, token, [...roster, ...found.everyone]);
+            return;
+          }
+        } catch {
+          setSignupError(message);
+          return;
+        }
+      }
+      setSignupError(message);
     } finally {
       setSigning(false);
     }
