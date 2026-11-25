@@ -11,7 +11,7 @@ export type ParsedTeams =
       teamA: PlayerRef[];
       teamB: PlayerRef[];
     }
-  | { ok: false; message: string };
+  | { ok: false; message: string; missing: string[] };
 
 const header = /^(verde|roxo)(?:\s*:?\s*\d{1,2})?$/i;
 
@@ -37,7 +37,7 @@ function resolve(token: string, players: PlayerRef[]) {
 
 export function parseTeamList(text: string, players: PlayerRef[], scores: { verde: number; roxo: number }): ParsedTeams {
   const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-  if (!lines.length) return { ok: false, message: "Cole a lista dos times." };
+  if (!lines.length) return { ok: false, message: "Cole a lista dos times.", missing: [] };
 
   const blocks: { color: TeamColor; names: string[] }[] = [];
   let current: (typeof blocks)[number] | null = null;
@@ -48,14 +48,14 @@ export function parseTeamList(text: string, players: PlayerRef[], scores: { verd
       blocks.push(current);
       continue;
     }
-    if (!current) return { ok: false, message: "Comece cada time com a cor, como VERDE." };
+    if (!current) return { ok: false, message: "Comece cada time com a cor, como VERDE.", missing: [] };
     current.names.push(line);
   }
 
-  if (blocks.length !== 2) return { ok: false, message: "A lista precisa ter o time verde e o time roxo." };
+  if (blocks.length !== 2) return { ok: false, message: "A lista precisa ter o time verde e o time roxo.", missing: [] };
   const colors = new Set(blocks.map((block) => block.color));
   if (!colors.has("verde") || !colors.has("roxo")) {
-    return { ok: false, message: "A lista precisa ter um time verde e um time roxo." };
+    return { ok: false, message: "A lista precisa ter um time verde e um time roxo.", missing: [] };
   }
 
   const missing: string[] = [];
@@ -80,7 +80,7 @@ export function parseTeamList(text: string, players: PlayerRef[], scores: { verd
   });
 
   if (missing.length) problems.unshift(`Não encontrei na listagem: ${missing.join(", ")}.`);
-  if (problems.length) return { ok: false, message: problems.join(" ") };
+  if (problems.length) return { ok: false, message: problems.join(" "), missing };
 
   return {
     ok: true,

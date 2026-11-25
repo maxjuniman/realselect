@@ -1,11 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import styled from "styled-components";
 import { clientApi } from "@/lib/client";
 import { formatDiff, nextTuesday, seasonCodeFromDate } from "@/lib/format";
-import { positionRank } from "@/lib/roster";
+import { POSITIONS, positionRank } from "@/lib/roster";
 import { parseTeamList } from "@/lib/team-list";
 import {
   Actions,
@@ -64,6 +64,10 @@ export function MatchForm({
   const [roxoScore, setRoxoScore] = useState("");
   const [listError, setListError] = useState("");
   const [fromList, setFromList] = useState(false);
+  const [roster, setRoster] = useState(players);
+  const [signup, setSignup] = useState<SignupDraft | null>(null);
+  const [signupError, setSignupError] = useState("");
+  const [signing, setSigning] = useState(false);
   const [sides, setSides] = useState<Record<string, Side>>(() => {
     const map: Record<string, Side> = {};
     initial?.teamA.forEach((player) => (map[player.id] = "A"));
@@ -85,21 +89,47 @@ export function MatchForm({
     return map;
   });
 
+  useEffect(() => {
+    setRoster((current) => {
+      const known = new Set(players.map((player) => player.id));
+      return [...players, ...current.filter((player) => !known.has(player.id))];
+    });
+  }, [players]);
+
+  useEffect(() => {
+    if (!signup) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setSignup(null);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [signup]);
+
+  const missingNames = useMemo(() => {
+    const parsed = parseTeamList(listText, roster.filter((player) => player.active !== false), { verde: 0, roxo: 0 });
+    return parsed.ok ? [] : [...new Set(parsed.missing)];
+  }, [listText, roster]);
+
   const visible = useMemo(() => {
     const term = query.trim().toLocaleLowerCase("pt-BR");
-    return players
+    return roster
       .filter((player) => showInactive || player.active || sides[player.id])
-      .filter((player) => !term || player.name.toLocaleLowerCase("pt-BR").includes(term))
+      .filter((player) => !term || player.name.toLocaleLowerCase("pt-BR").includes(term) || (player.nickname ?? "").toLocaleLowerCase("pt-BR").includes(term))
       .sort(byPosition);
-  }, [players, query, showInactive, sides]);
+  }, [roster, query, showInactive, sides]);
 
-  const teamA = players.filter((player) => sides[player.id] === "A");
-  const teamB = players.filter((player) => sides[player.id] === "B");
+  const sought = foldLabel(query);
+  const searchMiss =
+    sought.length >= 2 &&
+    !roster.some((player) => foldLabel(player.name).includes(sought) || foldLabel(player.nickname ?? "").includes(sought));
+
+  const teamA = roster.filter((player) => sides[player.id] === "A");
+  const teamB = roster.filter((player) => sides[player.id] === "B");
   const playing = [...teamA, ...teamB];
-  const professors = players
+  const professors = roster
     .filter(isMensalista)
     .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
-  const assigned = players.find((player) => player.id === professorId);
+  const assigned = roster.find((player) => player.id === professorId);
   const professorOptions = assigned && !professors.some((player) => player.id === assigned.id) ? [...professors, assigned] : professors;
   const tuesday = new Date(`${playedOn}T12:00:00`).getUTCDay() === 2;
   const scoring = !lineupOnly || fromList;
@@ -122,7 +152,7 @@ export function MatchForm({
       setListError("Informe o placar do verde e do roxo.");
       return;
     }
-    const activePlayers = players.filter((player) => player.active !== false);
+    const activePlayers = roster.filter((player) => player.active !== false);
     const parsed = parseTeamList(listText, activePlayers, { verde, roxo });
     if (!parsed.ok) {
       setListError(parsed.message);
@@ -139,6 +169,62 @@ export function MatchForm({
     setFromList(true);
     setListError("");
     setListOpen(false);
+  }
+
+  function openSignup(token: string) {
+    setSignupError("");
+    setSignup({ token, name: token, nickname: "", group: "suplente", first: "", second: "" });
+  }
+
+  async function registerPlayer(event: FormEvent) {
+    event.preventDefault();
+    if (!signup) return;
+    const name = signup.name.trim();
+    if (name.length < 2) {
+      setSignupError("O nome precisa ter pelo menos 2 caracteres.");
+      return;
+    }
+    const token = signup.token;
+    const typedNick = signup.nickname.trim();
+    const nickname = typedNick || (foldLabel(name) === foldLabel(token) ? "" : token);
+    setSigning(true);
+    setSignupError("");
+    try {
+      const created = await clientApi<PlayerRef>("/admin/players", {
+        method: "POST",
+        body: JSON.stringify({
+          name,
+          nickname: nickname || null,
+          positions: [signup.first, signup.second].filter(Boolean),
+          active: true,
+          squad: signup.group,
+        }),
+      });
+      const nextRoster = [...roster.filter((player) => player.id !== created.id), created];
+      const matchesToken = foldLabel(created.name) === foldLabel(token) || foldLabel(created.nickname ?? "") === foldLabel(token);
+      const nextText = matchesToken
+        ? listText
+        : listText
+            .split(/\r?\n/)
+            .map((line) => (line.trim() === token ? created.name : line))
+            .join("\n");
+      setRoster(nextRoster);
+      if (nextText !== listText) setListText(nextText);
+      setSignup(null);
+      const verdeText = verdeScore.trim();
+      const roxoText = roxoScore.trim();
+      if (/^\d{1,2}$/.test(verdeText) && /^\d{1,2}$/.test(roxoText)) {
+        const still = parseTeamList(nextText, nextRoster.filter((player) => player.active !== false), {
+          verde: Number(verdeText),
+          roxo: Number(roxoText),
+        });
+        setListError(still.ok ? "" : still.message);
+      }
+    } catch (caught) {
+      setSignupError(caught instanceof Error ? caught.message : "Não foi possível cadastrar.");
+    } finally {
+      setSigning(false);
+    }
   }
 
   function askSave() {
@@ -247,11 +333,80 @@ export function MatchForm({
               onChange={(event) => setListText(event.target.value)}
             />
             {listError ? <ErrorText>{listError}</ErrorText> : null}
+            {missingNames.length ? (
+              <MissingList>
+                {missingNames.map((name) => (
+                  <MissingRow key={name}>
+                    <span>{name}</span>
+                    <GhostButton type="button" onClick={() => openSignup(name)}>
+                      Cadastrar
+                    </GhostButton>
+                  </MissingRow>
+                ))}
+              </MissingList>
+            ) : null}
             <PrimaryButton type="button" onClick={applyList}>
               Separar times
             </PrimaryButton>
           </ListDialog>
         </Backdrop>
+      ) : null}
+      {signup ? (
+        <SignupBackdrop onMouseDown={() => setSignup(null)}>
+          <SignupDialog role="dialog" aria-modal="true" aria-labelledby="signup-title" onMouseDown={(event) => event.stopPropagation()} onSubmit={registerPlayer}>
+            <h2 id="signup-title">Cadastrar jogador</h2>
+            <Muted>Ele entra na listagem e já pode ir para o time.</Muted>
+            <Field>
+              Nome
+              <TextInput value={signup.name} onChange={(event) => setSignup({ ...signup, name: event.target.value })} required autoFocus />
+            </Field>
+            <Field>
+              Apelido
+              <TextInput value={signup.nickname} onChange={(event) => setSignup({ ...signup, nickname: event.target.value })} />
+            </Field>
+            {!signup.nickname.trim() && foldLabel(signup.name) !== foldLabel(signup.token) ? (
+              <Muted>Sem apelido, uso {signup.token} para achar esse nome na lista.</Muted>
+            ) : null}
+            <Field>
+              Grupo
+              <Select value={signup.group} onChange={(event) => setSignup({ ...signup, group: event.target.value as SignupDraft["group"] })}>
+                <option value="suplente">Suplente</option>
+                <option value="mensalista">Mensalista</option>
+              </Select>
+            </Field>
+            <Field>
+              1ª posição
+              <Select value={signup.first} onChange={(event) => setSignup({ ...signup, first: event.target.value, second: event.target.value === signup.second ? "" : signup.second })}>
+                <option value="">Sem posição</option>
+                {POSITIONS.map((position) => (
+                  <option key={position} value={position}>
+                    {position}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field>
+              2ª posição
+              <Select value={signup.second} onChange={(event) => setSignup({ ...signup, second: event.target.value })}>
+                <option value="">Nenhuma</option>
+                {POSITIONS.filter((position) => position !== signup.first).map((position) => (
+                  <option key={position} value={position}>
+                    {position}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            {signupError ? <ErrorText>{signupError}</ErrorText> : null}
+            <Actions>
+              <GhostButton type="button" onClick={() => setSignup(null)} disabled={signing}>
+                Cancelar
+              </GhostButton>
+              <PrimaryButton type="submit" disabled={signing}>
+                {signing ? "Salvando..." : "Cadastrar"}
+              </PrimaryButton>
+            </Actions>
+          </SignupDialog>
+        </SignupBackdrop>
       ) : null}
       {!scoring ? (
         <Field>
@@ -320,6 +475,11 @@ export function MatchForm({
           Mostrar inativos
         </Check>
       </Toolbar>
+      {searchMiss ? (
+        <GhostButton type="button" onClick={() => openSignup(query.trim())}>
+          Cadastrar {query.trim()}
+        </GhostButton>
+      ) : null}
 
       <ColorRow>
         <span>Cor do time A</span>
@@ -410,6 +570,24 @@ type Notice =
   | { step: "confirm"; action: "save" | "delete" }
   | { step: "result"; ok: boolean; message: string; href?: string }
   | null;
+
+type SignupDraft = {
+  token: string;
+  name: string;
+  nickname: string;
+  group: "mensalista" | "suplente";
+  first: string;
+  second: string;
+};
+
+function foldLabel(value: string) {
+  return value
+    .trim()
+    .toLocaleLowerCase("pt-BR")
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .replace(/\s+/g, " ");
+}
 
 function isMensalista(player: PlayerRef) {
   return player.active !== false && player.squad !== "suplente" && !player.guest;
@@ -508,6 +686,22 @@ const ListDialog = styled.div`
     font-size: 36px;
     letter-spacing: -0.03em;
     line-height: 0.95;
+  }
+`;
+
+const MissingList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`;
+
+const MissingRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  span {
+    font-weight: 700;
   }
 `;
 
@@ -626,6 +820,30 @@ const Backdrop = styled.div`
   place-items: center;
   padding: 20px;
   background: rgba(28, 16, 34, 0.46);
+`;
+
+const SignupBackdrop = styled(Backdrop)`
+  z-index: 40;
+`;
+
+const SignupDialog = styled.form`
+  width: min(440px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  background: ${({ theme }) => theme.paper};
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  h2 {
+    margin: 0;
+    font-family: ${({ theme }) => theme.display};
+    font-stretch: 87.5%;
+    font-weight: 700;
+    font-size: 36px;
+    letter-spacing: -0.03em;
+    line-height: 0.95;
+  }
 `;
 
 const Dialog = styled.div`
